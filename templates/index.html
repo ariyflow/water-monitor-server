@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>水质监测数据管理</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+</head>
+<body>
+  <header class="topbar">
+    <h1>水质监测数据管理</h1>
+    <span class="sub">Water Monitor Server</span>
+  </header>
+
+  <main class="container">
+    <section class="toolbar">
+      <button id="btn-refresh" class="btn btn-primary">刷新</button>
+      <button id="btn-add" class="btn btn-success">新增记录</button>
+      <span id="total" class="muted">共 0 条记录</span>
+    </section>
+
+    <section class="card">
+      <table class="table" id="sensor-table">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>设备ID</th>
+            <th>pH</th>
+            <th>温度 (°C)</th>
+            <th>水流量</th>
+            <th>浊度</th>
+            <th>电导率</th>
+            <th>时间戳</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody id="tbody">
+          <tr><td colspan="9" class="empty">加载中...</td></tr>
+        </tbody>
+      </table>
+    </section>
+  </main>
+
+  <div id="modal" class="modal hidden">
+    <div class="modal-box">
+      <h2 id="modal-title">新增记录</h2>
+      <form id="modal-form">
+        <label>设备ID *
+          <input type="text" name="deviceid" required placeholder="如 A5A5A5A5A5A5" />
+        </label>
+        <label>pH
+          <input type="text" name="ph" placeholder="如 7" />
+        </label>
+        <label>温度 (°C)
+          <input type="text" name="temperature" placeholder="如 25" />
+        </label>
+        <label>水流量
+          <input type="text" name="flow" placeholder="如 10" />
+        </label>
+        <label>浊度
+          <input type="text" name="turbidity" placeholder="如 10" />
+        </label>
+        <label>电导率
+          <input type="text" name="conductivity" placeholder="如 100" />
+        </label>
+        <div class="modal-actions">
+          <button type="button" id="btn-cancel" class="btn">取消</button>
+          <button type="submit" id="btn-save" class="btn btn-primary">保存</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>

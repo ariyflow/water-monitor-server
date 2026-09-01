@@ -124,7 +124,7 @@ wheels = [
 [[package]]
 name = "water-monitor-server-v0-0"
 version = "0.1.0"
-source = { editable = "." }
+source = { virtual = "." }
 dependencies = [
     { name = "flask" },
 ]
