@@ -2,6 +2,15 @@ const API = "/api/sensors";
 
 const state = { editingId: null };
 
+async function apiFetch(url, options = {}) {
+  const res = await fetch(url, options);
+  if (res.status === 401) {
+    window.location.href = "/login";
+    throw new Error("Unauthorized");
+  }
+  return res;
+}
+
 const tbody = document.getElementById("tbody");
 const totalEl = document.getElementById("total");
 
@@ -28,7 +37,7 @@ function esc(value) {
 async function loadData() {
   tbody.innerHTML = `<tr><td colspan="9" class="empty">加载中...</td></tr>`;
   try {
-    const res = await fetch(API);
+    const res = await apiFetch(API);
     const json = await res.json();
     totalEl.textContent = `共 ${json.total} 条记录`;
     if (!json.data.length) {
@@ -96,14 +105,14 @@ async function saveRecord(e) {
   }
   try {
     if (state.editingId) {
-      await fetch(`${API}/${state.editingId}`, {
+      await apiFetch(`${API}/${state.editingId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
       showToast("更新成功", "success");
     } else {
-      await fetch(API, {
+      await apiFetch(API, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -120,7 +129,7 @@ async function saveRecord(e) {
 async function deleteRecord(id) {
   if (!confirm("确定删除该记录吗？")) return;
   try {
-    await fetch(`${API}/${id}`, { method: "DELETE" });
+    await apiFetch(`${API}/${id}`, { method: "DELETE" });
     showToast("删除成功", "success");
     loadData();
   } catch (err) {
@@ -130,6 +139,16 @@ async function deleteRecord(id) {
 
 document.getElementById("btn-refresh").addEventListener("click", loadData);
 document.getElementById("btn-add").addEventListener("click", () => openModal());
+
+const btnLogout = document.getElementById("btn-logout");
+if (btnLogout) {
+  btnLogout.addEventListener("click", async () => {
+    try {
+      await apiFetch("/api/auth/logout", { method: "POST" });
+    } catch (err) {}
+    window.location.href = "/login";
+  });
+}
 document.getElementById("btn-cancel").addEventListener("click", closeModal);
 modalForm.addEventListener("submit", saveRecord);
 modal.addEventListener("click", (e) => { if (e.target === modal) closeModal(); });
@@ -139,7 +158,7 @@ tbody.addEventListener("click", (e) => {
   const delBtn = e.target.closest("[data-del]");
   if (editBtn) {
     const id = Number(editBtn.dataset.edit);
-    fetch(`${API}/${id}`)
+    apiFetch(`${API}/${id}`)
       .then((r) => r.json())
       .then((json) => openModal(json.data));
   } else if (delBtn) {

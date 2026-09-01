@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>登录 - 水质监测数据管理</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+</head>
+<body>
+  <main class="auth-container">
+    <div class="auth-box">
+      <h1 class="auth-title">水质监测数据管理</h1>
+      <p class="auth-sub">Water Monitor Server</p>
+
+      <div class="auth-tabs">
+        <button type="button" class="auth-tab active" data-tab="login">登录</button>
+        <button type="button" class="auth-tab" data-tab="register">注册</button>
+      </div>
+
+      <form id="login-form" class="auth-form">
+        <label>用户名
+          <input type="text" name="username" required autocomplete="username" placeholder="请输入用户名" />
+        </label>
+        <label>密码
+          <input type="password" name="password" required autocomplete="current-password" placeholder="请输入密码" />
+        </label>
+        <button type="submit" class="btn btn-primary btn-block">登录</button>
+      </form>
+
+      <form id="register-form" class="auth-form hidden">
+        <label>用户名
+          <input type="text" name="username" required autocomplete="username" placeholder="请输入用户名" />
+        </label>
+        <label>密码
+          <input type="password" name="password" required autocomplete="new-password" minlength="6" placeholder="至少 6 位" />
+        </label>
+        <label>确认密码
+          <input type="password" name="password2" required autocomplete="new-password"placeholder="请再次输入密码" />
+        </label>
+        <button type="submit" class="btn btn-primary btn-block">注册</button>
+      </form>
+
+      <p id="auth-msg" class="auth-msg"></p>
+    </div>
+  </main>
+
+  <script src="{{ url_for('static', filename='js/auth.js') }}"></script>
+</body>
+</html>

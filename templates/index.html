@@ -10,6 +10,9 @@
   <header class="topbar">
     <h1>水质监测数据管理</h1>
     <span class="sub">Water Monitor Server</span>
+    <span class="topbar-spacer"></span>
+    <span class="topbar-user">{% if user %}{{ user.username }}{% endif %}</span>
+    <button id="btn-logout" class="btn btn-outline">退出登录</button>
   </header>
 
   <main class="container">

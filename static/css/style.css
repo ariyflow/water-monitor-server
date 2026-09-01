@@ -18,6 +18,11 @@ body {
 
 .topbar h1 { margin: 0; font-size: 1.4rem; }
 .topbar .sub { font-size: 0.85rem; opacity: 0.85; }
+.topbar-spacer { flex: 1; }
+.topbar-user { font-size: 0.9rem; margin-left: auto; }
+
+.btn-outline { background: transparent; border-color: #fff; color: #fff; }
+.btn-outline:hover { background: rgba(255,255,255,0.15); }
 
 .container { max-width: 1100px; margin: 1.5rem auto 4rem; padding: 0 1rem; }
 
@@ -99,3 +104,53 @@ body {
 .toast.info { background: #1f6feb; }
 .toast.success { background: #22a36c; }
 .toast.error { background: #e5484d; }
+
+/* Authentication */
+.auth-container {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(160deg, #1f6feb, #7b5cff);
+  padding: 1rem;
+}
+.auth-box {
+  background: #fff;
+  width: 380px;
+  max-width: 100%;
+  border-radius: 14px;
+  padding: 2rem 1.8rem;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.2);
+}
+.auth-title { margin: 0; font-size: 1.3rem; text-align: center; }
+.auth-sub { margin: 0.25rem 0 1.2rem; text-align: center; color: #7a8496; font-size: 0.85rem; }
+.auth-tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1.2rem;
+  background: #f0f3f7;
+  padding: 0.25rem;
+  border-radius: 8px;
+}
+.auth-tab {
+  flex: 1;
+  padding: 0.5rem;
+  border: none;
+  background: transparent;
+  color: #5b6472;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+.auth-tab.active { background: #fff; color: #1f6feb; font-weight: 600; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+.auth-form label { display: block; font-size: 0.85rem; color: #5b6472; margin-bottom: 0.85rem; }
+.auth-form input {
+  width: 100%; margin-top: 0.25rem; padding: 0.55rem 0.7rem;
+  border: 1px solid #d6dce6; border-radius: 6px; font-size: 0.9rem;
+}
+.auth-form input:focus { outline: none; border-color: #1f6feb; }
+.auth-form.hidden { display: none; }
+.auth-form .btn-block { width: 100%; margin-top: 0.5rem; padding: 0.65rem; font-size: 0.95rem; }
+.auth-msg { min-height: 1.2rem; text-align: center; font-size: 0.82rem; margin: 0.9rem 0 0; }
+.auth-msg.error { color: #e5484d; }
+.auth-msg.success { color: #22a36c; }

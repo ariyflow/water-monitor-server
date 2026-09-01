@@ -11,6 +11,13 @@ from datetime import datetime
 from typing import Any
 
 SCHEMA = """
+CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT NOT NULL UNIQUE,
+    password_hash TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS sensor_data (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     deviceid TEXT NOT NULL,
@@ -185,3 +192,52 @@ def count_records(app: Any) -> int:
         return int(row["c"])
     finally:
         conn.close()
+
+
+def create_user(app: Any, username: str, password_hash: str) -> dict[str, Any]:
+    """Insert a new user, storing the password as a pre-hashed value.
+
+    The caller is responsible for hashing the plaintext password; this module
+    only persists the digest so no plaintext is ever stored.
+    """
+    created_at = _now()
+    conn = _connect(app)
+    try:
+        cur = conn.execute(
+            """
+            INSERT INTO users (username, password_hash, created_at)
+            VALUES (?, ?, ?)
+            """,
+            (username, password_hash, created_at),
+        )
+        conn.commit()
+        user_id = cur.lastrowid
+    finally:
+        conn.close()
+    return get_user_by_id(app, user_id) or {}
+
+
+def get_user_by_username(app: Any, username: str) -> dict[str, Any] | None:
+    """Return a user by username, or None if it does not exist."""
+    conn = _connect(app)
+    try:
+        row = conn.execute(
+            "SELECT id, username, password_hash, created_at FROM users WHERE username = ?",
+            (username,),
+        ).fetchone()
+    finally:
+        conn.close()
+    return _row_to_dict(row)
+
+
+def get_user_by_id(app: Any, user_id: int) -> dict[str, Any] | None:
+    """Return a user by id, or None if it does not exist."""
+    conn = _connect(app)
+    try:
+        row = conn.execute(
+            "SELECT id, username, password_hash, created_at FROM users WHERE id = ?",
+            (user_id,),
+        ).fetchone()
+    finally:
+        conn.close()
+    return _row_to_dict(row)

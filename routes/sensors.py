@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from flask import Blueprint, current_app, jsonify, request
 
+from auth import api_login_required
 from db import (
     count_records,
     create_record,
@@ -21,6 +22,7 @@ def _error(message: str, status: int = 400):
 
 
 @sensors_bp.get("/api/sensors")
+@api_login_required
 def list_sensors():
     """List sensor readings, newest first, with pagination support."""
     limit = max(0, min(int(request.args.get("limit", 200)), 1000))
@@ -39,6 +41,7 @@ def list_sensors():
 
 
 @sensors_bp.get("/api/sensors/<int:record_id>")
+@api_login_required
 def get_sensor(record_id: int):
     """Return a single sensor reading."""
     record = get_record(current_app, record_id)
@@ -48,6 +51,7 @@ def get_sensor(record_id: int):
 
 
 @sensors_bp.post("/api/sensors")
+@api_login_required
 def create_sensor():
     """Receive sensor data from a device and store it with a system timestamp."""
     payload = request.get_json(silent=True)
@@ -62,6 +66,7 @@ def create_sensor():
 
 
 @sensors_bp.put("/api/sensors/<int:record_id>")
+@api_login_required
 def update_sensor(record_id: int):
     """Update an existing sensor reading (partial update allowed)."""
     payload = request.get_json(silent=True)
@@ -75,6 +80,7 @@ def update_sensor(record_id: int):
 
 
 @sensors_bp.delete("/api/sensors/<int:record_id>")
+@api_login_required
 def delete_sensor(record_id: int):
     """Delete a sensor reading."""
     if not delete_record(current_app, record_id):
