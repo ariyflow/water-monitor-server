@@ -54,7 +54,7 @@ async function loadData() {
 function renderRow(r) {
   return `<tr>
     <td>${esc(r.id)}</td>
-    <td>${esc(r.deviceid)}</td>
+    <td>${esc(r.serial || "—")}</td>
     <td>${esc(r.ph)}</td>
     <td>${esc(r.temperature)}</td>
     <td>${esc(r.flow)}</td>
@@ -73,7 +73,7 @@ function openModal(record = null) {
   modalTitle.textContent = record ? "编辑记录" : "新增记录";
   modalForm.reset();
   if (record) {
-    modalForm.deviceid.value = record.deviceid || "";
+    modalForm.serial.value = record.serial || "";
     modalForm.ph.value = record.ph || "";
     modalForm.temperature.value = record.temperature || "";
     modalForm.flow.value = record.flow || "";
@@ -87,7 +87,7 @@ function closeModal() { modal.classList.add("hidden"); }
 
 function formPayload() {
   return {
-    deviceid: modalForm.deviceid.value.trim(),
+    serial: modalForm.serial.value.trim(),
     ph: modalForm.ph.value.trim(),
     temperature: modalForm.temperature.value.trim(),
     flow: modalForm.flow.value.trim(),
@@ -99,8 +99,8 @@ function formPayload() {
 async function saveRecord(e) {
   e.preventDefault();
   const payload = formPayload();
-  if (!payload.deviceid) {
-    showToast("设备ID不能为空", "error");
+  if (!payload.serial) {
+    showToast("设备序列号不能为空", "error");
     return;
   }
   try {

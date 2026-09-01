@@ -4,11 +4,12 @@ from __future__ import annotations
 
 from flask import Blueprint, current_app, jsonify, request
 
-from auth import api_login_required
+from auth import api_login_required, current_user
 from db import (
     count_records,
     create_record,
     delete_record,
+    get_device_by_serial,
     get_record,
     list_records,
     update_record,
@@ -24,12 +25,15 @@ def _error(message: str, status: int = 400):
 @sensors_bp.get("/api/sensors")
 @api_login_required
 def list_sensors():
-    """List sensor readings, newest first, with pagination support."""
+    """List readings for the current user's devices, newest first."""
+    user = current_user(current_app)
+    user_id = user["id"] if user else None
+
     limit = max(0, min(int(request.args.get("limit", 200)), 1000))
     offset = max(0, int(request.args.get("offset", 0)))
 
-    records = list_records(current_app, limit=limit, offset=offset)
-    total = count_records(current_app)
+    records = list_records(current_app, limit=limit, offset=offset, user_id=user_id)
+    total = count_records(current_app, user_id=user_id)
     return jsonify(
         {
             "total": total,
@@ -51,17 +55,25 @@ def get_sensor(record_id: int):
 
 
 @sensors_bp.post("/api/sensors")
-@api_login_required
 def create_sensor():
-    """Receive sensor data from a device and store it with a system timestamp."""
+    """Receive sensor data reported by a device, identified by its serial.
+
+    This endpoint is device-driven (no user session): the device submits its
+    serial plus the measurements, and the reading is stored under that device.
+    """
     payload = request.get_json(silent=True)
     if not isinstance(payload, dict):
         return _error("Request body must be a JSON object")
 
-    if not payload.get("deviceid"):
-        return _error("Field 'deviceid' is required")
+    serial = (payload.get("serial") or payload.get("deviceid") or "").strip()
+    if not serial:
+        return _error("Field 'serial' is required")
 
-    record = create_record(current_app, payload)
+    device = get_device_by_serial(current_app, serial)
+    if device is None:
+        return _error("设备不存在或序列号无效", 404)
+
+    record = create_record(current_app, device["id"], payload)
     return jsonify({"data": record}), 201
 
 
