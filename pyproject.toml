@@ -1,0 +1,19 @@
+[project]
+name = "water-monitor-server-v0-0"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "ariyflow", email = "ariyflow4342@gmail.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "flask>=3.1.3",
+]
+
+[project.scripts]
+water-monitor-server-v0-0 = "water_monitor_server_v0_0:main"
+
+[build-system]
+requires = ["uv_build>=0.12.7,<0.13.0"]
+build-backend = "uv_build"
