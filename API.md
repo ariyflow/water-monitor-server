@@ -6,7 +6,7 @@
 
 - **Base URL**：`http://<host>:15382`（`<host>` 为部署主机，本机可用 `localhost`）。
 - **数据格式**：请求/响应均为 JSON；请求头 `Content-Type: application/json`。
-- **认证**：基于 Cookie 的 Flask Session。除「设备上报数据」外，多数接口要求登录。
+- **认证**：基于 Cookie 的 Flask Session。「设备分配序列号」（`POST /api/devices`）与「设备上报数据」（`POST /api/sensors`）为设备驱动接口，无需登录；其余接口要求登录。
   - 用 `curl` 时先登录并保存 Cookie：`-c cookie.txt`，后续请求携带 `-b cookie.txt`。
   - 未登录访问受保护接口返回 `401 {"error": "Authentication required"}`。
 - **错误格式**：统一返回 `{"error": "<说明信息>"}`，配合相应 HTTP 状态码。
@@ -79,7 +79,7 @@
 设备序列号为 **6 字节随机值**，以 12 位十六进制字符串表示。由绑定用户获得，设备保存后凭该序列号上报数据。
 
 ### `POST /api/devices`
-- **认证**：需要。
+- **认证**：**不需要**（设备/调用方可自动请求分配序列号）。
 - **说明**：生成序列号并绑定设备到指定用户名（该用户需已注册）。
 - **请求体（JSON）**：
   | 字段 | 类型 | 必填 | 说明 |
@@ -94,7 +94,6 @@
 - **错误**：
   - `400` `{"error": "Field 'username' is required"}`
   - `404` `{"error": "用户不存在"}`
-  - `401` 未登录
 
 ### `GET /api/devices`
 - **认证**：需要。
@@ -213,9 +212,9 @@ curl -c cookie.txt -X POST http://localhost:15382/api/auth/login \
   -d '{"username":"yw","password":"你的密码"}'
 ```
 
-**2. 为设备分配序列号并绑定用户**
+**2. 为设备分配序列号并绑定用户（无需登录）**
 ```bash
-curl -b cookie.txt -X POST http://localhost:15382/api/devices \
+curl -X POST http://localhost:15382/api/devices \
   -H "Content-Type: application/json" \
   -d '{"username":"yw","name":"河边一号"}'
 ```

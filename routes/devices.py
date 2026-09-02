@@ -34,7 +34,6 @@ def _device_payload(device: dict, username: str | None = None) -> dict:
 
 
 @devices_bp.post("/api/devices")
-@api_login_required
 def assign_device():
     """Generate a serial and bind a new device to the given username.
 
