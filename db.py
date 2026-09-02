@@ -53,7 +53,26 @@ CREATE TABLE IF NOT EXISTS api_tokens (
 );
 """
 
-SCHEMA = USERS_DDL + DEVICES_DDL + SENSOR_DATA_DDL + API_TOKENS_DDL
+ALARMS_DDL = """
+CREATE TABLE IF NOT EXISTS alarms (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    device_id INTEGER NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
+    type TEXT NOT NULL DEFAULT '',
+    value REAL,
+    threshold REAL,
+    ph TEXT NOT NULL DEFAULT '',
+    temperature TEXT NOT NULL DEFAULT '',
+    flow TEXT NOT NULL DEFAULT '',
+    turbidity TEXT NOT NULL DEFAULT '',
+    conductivity TEXT NOT NULL DEFAULT '',
+    message TEXT NOT NULL DEFAULT '',
+    active INTEGER NOT NULL DEFAULT 1,
+    is_read INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL
+);
+"""
+
+SCHEMA = USERS_DDL + DEVICES_DDL + SENSOR_DATA_DDL + API_TOKENS_DDL + ALARMS_DDL
 
 API_TOKEN_TTL_SECONDS = 7 * 24 * 3600  # 7 days
 
@@ -632,5 +651,142 @@ def count_records(
         else:
             row = conn.execute("SELECT COUNT(*) AS c FROM sensor_data").fetchone()
         return int(row["c"])
+    finally:
+        conn.close()
+
+# --- Alarms -----------------------------------------------------------
+
+
+
+def create_alarm(
+    app: Any,
+    device_id: int,
+    payload: dict[str, Any],
+) -> dict[str, Any]:
+    """Insert an alarm event reported by a device."""
+    value = payload.get("value")
+    threshold = payload.get("threshold")
+    conn = _connect(app)
+    try:
+        cur = conn.execute(
+            "INSERT INTO alarms (device_id, type, value, threshold, ph, temperature, flow, turbidity, conductivity, message, active, is_read, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)",
+            (
+                device_id,
+                payload.get("type") or "",
+                value,
+                threshold,
+                _clean_measurements(payload)["ph"],
+                _clean_measurements(payload)["temperature"],
+                _clean_measurements(payload)["flow"],
+                _clean_measurements(payload)["turbidity"],
+                _clean_measurements(payload)["conductivity"],
+                payload.get("message") or "",
+                1 if payload.get("active", True) else 0,
+                _now(),
+            ),
+        )
+        conn.commit()
+        alarm_id = cur.lastrowid
+    finally:
+        conn.close()
+    return get_alarm(app, alarm_id) or {}
+
+
+_ALARM_JOIN = (
+    "SELECT a.id, a.device_id, d.serial, d.name AS device_name, "
+    "a.type, a.value, a.threshold, a.ph, a.temperature, a.flow, a.turbidity, "
+    "a.conductivity, a.message, a.active, a.is_read, a.created_at "
+    "FROM alarms a JOIN devices d ON d.id = a.device_id "
+)
+
+
+def get_alarm(app: Any, alarm_id: int) -> dict[str, Any] | None:
+    """Return a single alarm (with its device serial/name), or None."""
+    conn = _connect(app)
+    try:
+        row = conn.execute(_ALARM_JOIN + "WHERE a.id = ?", (alarm_id,)).fetchone()
+    finally:
+        conn.close()
+    return _row_to_dict(row)
+
+
+def list_alarms(
+    app: Any,
+    user_id: int | None = None,
+    limit: int = 50,
+    offset: int = 0,
+    unread_only: bool = False,
+    active_only: bool = False,
+) -> list[dict[str, Any]]:
+    """Return alarms for a user's devices, newest first."""
+    conn = _connect(app)
+    try:
+        clauses = []
+        params: list[Any] = []
+        if user_id is not None:
+            clauses.append("d.user_id = ?")
+            params.append(user_id)
+        if unread_only:
+            clauses.append("a.is_read = 0")
+        if active_only:
+            clauses.append("a.active = 1")
+        where = ("WHERE " + " AND ".join(clauses)) if clauses else ""
+        rows = conn.execute(
+            _ALARM_JOIN
+            + where
+            + " ORDER BY a.id DESC LIMIT ? OFFSET ?",
+            tuple(params + [limit, offset]),
+        ).fetchall()
+    finally:
+        conn.close()
+    return [_row_to_dict(row) for row in rows]
+
+
+def count_alarms(
+    app: Any,
+    user_id: int | None = None,
+    unread_only: bool = False,
+    active_only: bool = False,
+) -> int:
+    """Count alarms, optionally scoped to a user's devices."""
+    conn = _connect(app)
+    try:
+        clauses = []
+        params: list[Any] = []
+        if user_id is not None:
+            clauses.append("d.user_id = ?")
+            params.append(user_id)
+        if unread_only:
+            clauses.append("a.is_read = 0")
+        if active_only:
+            clauses.append("a.active = 1")
+        where = ("WHERE " + " AND ".join(clauses)) if clauses else ""
+        row = conn.execute(
+            "SELECT COUNT(*) AS c FROM alarms a JOIN devices d ON d.id = a.device_id "
+            + where,
+            tuple(params),
+        ).fetchone()
+        return int(row["c"])
+    finally:
+        conn.close()
+
+
+def mark_alarm_read(app: Any, alarm_id: int, user_id: int | None = None) -> bool:
+    """Mark an alarm read, optionally verifying it belongs to the user."""
+    conn = _connect(app)
+    try:
+        if user_id is not None:
+            cur = conn.execute(
+                "UPDATE alarms SET is_read = 1 WHERE id = ? AND device_id IN "
+                "(SELECT id FROM devices WHERE user_id = ?)",
+                (alarm_id, user_id),
+            )
+        else:
+            cur = conn.execute(
+                "UPDATE alarms SET is_read = 1 WHERE id = ?", (alarm_id,)
+            )
+        conn.commit()
+        return cur.rowcount > 0
     finally:
         conn.close()

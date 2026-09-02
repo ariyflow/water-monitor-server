@@ -10,6 +10,7 @@ from flask import Flask
 from auth import hash_password
 from db import ensure_user, init_db
 from routes.admin import admin_bp
+from routes.alarms import alarms_bp
 from routes.auth import auth_bp
 from routes.devices import devices_bp
 from routes.sensors import sensors_bp
@@ -56,5 +57,6 @@ def create_app(test_config: dict | None = None) -> Flask:
     app.register_blueprint(sensors_bp)
     app.register_blueprint(web_bp)
     app.register_blueprint(admin_bp)
+    app.register_blueprint(alarms_bp)
 
     return app
