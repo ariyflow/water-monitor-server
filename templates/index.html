@@ -12,6 +12,9 @@
     <span class="sub">Water Monitor Server</span>
     <span class="topbar-spacer"></span>
     <span class="topbar-user">{% if user %}{{ user.username }}{% endif %}</span>
+    {% if user and user.is_admin %}
+    <a href="{{ url_for('admin.admin_page') }}" class="btn btn-outline">管理后台</a>
+    {% endif %}
     <button id="btn-logout" class="btn btn-outline">退出登录</button>
   </header>
 

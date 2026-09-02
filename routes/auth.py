@@ -31,7 +31,12 @@ def _public_user(user: dict[str, Any] | None) -> dict[str, Any] | None:
     """Strip the password hash before returning a user to the client."""
     if user is None:
         return None
-    return {"id": user["id"], "username": user["username"], "created_at": user["created_at"]}
+    return {
+        "id": user["id"],
+        "username": user["username"],
+        "is_admin": bool(user.get("is_admin")),
+        "created_at": user["created_at"],
+    }
 
 
 @auth_bp.get("/login")

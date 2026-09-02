@@ -6,7 +6,7 @@ import hashlib
 from functools import wraps
 from typing import Any, Callable, TypeVar
 
-from flask import jsonify, redirect, session, url_for
+from flask import current_app, jsonify, redirect, session, url_for
 
 from db import get_user_by_id
 
@@ -50,6 +50,36 @@ def api_login_required(view: View) -> View:
     def wrapped(*args: Any, **kwargs: Any) -> Any:
         if session.get("user_id") is None:
             return jsonify({"error": "Authentication required"}), 401
+        return view(*args, **kwargs)
+
+    return wrapped  # type: ignore[return-value]
+
+
+def api_admin_required(view: View) -> View:
+    """Return 403 JSON unless the request is made by an admin user."""
+
+    @wraps(view)
+    def wrapped(*args: Any, **kwargs: Any) -> Any:
+        if session.get("user_id") is None:
+            return jsonify({"error": "Authentication required"}), 401
+        user = get_user_by_id(current_app, session.get("user_id"))
+        if user is None or not user.get("is_admin"):
+            return jsonify({"error": "Admin privileges required"}), 403
+        return view(*args, **kwargs)
+
+    return wrapped  # type: ignore[return-value]
+
+
+def admin_required(view: View) -> View:
+    """Redirect to the app home unless the user is an admin."""
+
+    @wraps(view)
+    def wrapped(*args: Any, **kwargs: Any) -> Any:
+        if session.get("user_id") is None:
+            return redirect(url_for("auth.login_page"))
+        user = get_user_by_id(current_app, session.get("user_id"))
+        if user is None or not user.get("is_admin"):
+            return redirect(url_for("web.index"))
         return view(*args, **kwargs)
 
     return wrapped  # type: ignore[return-value]

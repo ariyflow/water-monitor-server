@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>管理员后台 - 水质监测数据管理</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+  <style>
+    .admin-wrap { max-width: 1200px; margin: 1.5rem auto 4rem; padding: 0 1rem; }
+    .selectors { background: #fff; border-radius: 10px; padding: 1rem 1.2rem; margin-bottom: 1rem; box-shadow: 0 2px 10px rgba(0,0,0,0.06); display: flex; gap: 1.5rem; flex-wrap: wrap; }
+    .selector { flex: 1; min-width: 240px; }
+    .selector label { display: block; font-size: 0.85rem; color: #5b6472; margin-bottom: 0.35rem; }
+    .selector select { width: 100%; padding: 0.5rem 0.65rem; border: 1px solid #d6dce6; border-radius: 6px; font-size: 0.9rem; background: #fff; }
+    .selector select:focus { outline: none; border-color: #1f6feb; }
+    .card { background: #fff; border-radius: 10px; padding: 1rem; box-shadow: 0 2px 10px rgba(0,0,0,0.06); overflow-x: auto; }
+    .empty { text-align: center; color: #9aa3b2; padding: 2rem; }
+    .table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+    .table th, .table td { padding: 0.6rem 0.6rem; text-align: left; border-bottom: 1px solid #eceff3; }
+    .table th { background: #f8fafc; color: #5b6472; font-weight: 600; white-space: nowrap; }
+    .table tr:hover td { background: #f5f8ff; }
+    .toolbar { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem; }
+    .muted { color: #7a8496; font-size: 0.9rem; }
+    .pager { display: flex; align-items: center; gap: 0.6rem; margin-top: 0.9rem; justify-content: flex-end; flex-wrap: wrap; }
+    .pager button:disabled { background: #eef1f5; color: #a6afbc; cursor: not-allowed; }
+    #page-input { width: 70px; padding: 0.35rem 0.5rem; border: 1px solid #d6dce6; border-radius: 6px; font-size: 0.85rem; }
+    #page-input:focus { outline: none; border-color: #1f6feb; }
+    .user-actions { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
+    .badge { font-size: 0.72rem; padding: 0.15rem 0.5rem; border-radius: 999px; background: #eef2ff; color: #4f46e5; }
+    .badge.admin { background: #ffe9e9; color: #cf3c41; }
+    .modal-box label { display: block; font-size: 0.85rem; color: #5b6472; margin-bottom: 0.6rem; }
+    .modal-box input { width: 100%; margin-top: 0.25rem; padding: 0.5rem 0.65rem; border: 1px solid #d6dce6; border-radius: 6px; font-size: 0.9rem; }
+    .modal-box input:focus { outline: none; border-color: #1f6feb; }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <h1>管理员后台</h1>
+    <span class="sub">选择用户 → 设备 → 查看数据</span>
+    <span class="topbar-spacer"></span>
+    <span class="topbar-user">{% if user %}{{ user.username }}（管理员）{% endif %}</span>
+    <button id="btn-back" class="btn btn-outline">返回</button>
+    <button id="btn-logout" class="btn btn-outline">退出登录</button>
+  </header>
+
+  <main class="admin-wrap">
+    <section class="selectors">
+      <div class="selector">
+        <label for="sel-user">用户</label>
+        <select id="sel-user"><option value="">请选择用户</option></select>
+      </div>
+      <div class="selector">
+        <label for="sel-device">设备</label>
+        <select id="sel-device" disabled><option value="">请先选择用户</option></select>
+      </div>
+    </section>
+
+    <section class="card user-actions" id="user-actions" style="display:none;margin-bottom:1rem;">
+      <span>已选择用户：<strong id="ua-username"></strong><span id="ua-role" class="badge" style="margin-left:0.5rem;"></span></span>
+      <span class="topbar-spacer"></span>
+      <button id="btn-reset-pwd" class="btn">修改密码</button>
+      <button id="btn-del-user" class="btn btn-danger">删除用户</button>
+    </section>
+
+    <section class="toolbar">
+      <span id="summary" class="muted">请选择用户与设备</span>
+      <span class="topbar-spacer"></span>
+      <label class="muted" style="font-size:0.85rem;">每页
+        <select id="page-size" style="padding:0.25rem 0.5rem;border-radius:6px;border:1px solid #d6dce6;">
+          <option value="20">20</option>
+          <option value="50" selected>50</option>
+          <option value="100">100</option>
+        </select>
+      </label>
+    </section>
+
+    <section class="card" id="data-card">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>ID</th><th>pH</th><th>温度 (°C)</th><th>水流量</th>
+            <th>浊度</th><th>电导率</th><th>时间戳</th>
+          </tr>
+        </thead>
+        <tbody id="tbody">
+          <tr><td colspan="7" class="empty">暂无数据</td></tr>
+        </tbody>
+      </table>
+      <div class="pager">
+        <button id="btn-prev" class="btn" disabled>上一页</button>
+        <span id="page-info" class="muted">第 0 / 0 页</span>
+        <button id="btn-next" class="btn" disabled>下一页</button>
+        <span class="muted">跳至</span>
+        <input type="number" id="page-input" min="1" value="1" />
+        <button id="btn-goto" class="btn">跳转</button>
+      </div>
+    </section>
+  </main>
+
+  <div id="pwd-modal" class="modal hidden">
+    <div class="modal-box">
+      <h2>修改密码</h2>
+      <form id="pwd-form">
+        <label>用户名</label>
+        <input type="text" id="pwd-username" disabled />
+        <label>新密码（至少 6 位）
+          <input type="password" name="password" required minlength="6" autocomplete="new-password" />
+        </label>
+        <label>确认新密码
+          <input type="password" name="password2" required minlength="6" autocomplete="new-password" />
+        </label>
+        <div class="modal-actions">
+          <button type="button" id="btn-pwd-cancel" class="btn">取消</button>
+          <button type="submit" class="btn btn-primary">保存</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="{{ url_for('static', filename='js/admin.js') }}"></script>
+</body>
+</html>

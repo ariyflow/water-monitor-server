@@ -7,13 +7,26 @@ from pathlib import Path
 
 from flask import Flask
 
-from db import init_db
+from auth import hash_password
+from db import create_user, get_user_by_username, init_db, set_admin
+from routes.admin import admin_bp
 from routes.auth import auth_bp
 from routes.devices import devices_bp
 from routes.sensors import sensors_bp
 from routes.web import web_bp
 
 BASE_DIR = Path(__file__).resolve().parent
+
+ADMIN_USERNAME = "admin"
+ADMIN_PASSWORD = "admin54321"
+
+
+def ensure_admin_user(app: Flask) -> None:
+    """Create the admin account on first run so it exists out of the box."""
+    with app.app_context():
+        if get_user_by_username(app, ADMIN_USERNAME) is None:
+            user = create_user(app, ADMIN_USERNAME, hash_password(ADMIN_PASSWORD))
+            set_admin(app, user["id"], True)
 
 
 def create_app(test_config: dict | None = None) -> Flask:
@@ -34,10 +47,12 @@ def create_app(test_config: dict | None = None) -> Flask:
         app.config.update(test_config)
 
     init_db(app)
+    ensure_admin_user(app)
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(devices_bp)
     app.register_blueprint(sensors_bp)
     app.register_blueprint(web_bp)
+    app.register_blueprint(admin_bp)
 
     return app
