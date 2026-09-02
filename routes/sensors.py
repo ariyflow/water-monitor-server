@@ -11,6 +11,7 @@ from db import (
     delete_record,
     get_device_by_serial,
     get_record,
+    latest_records,
     list_records,
     update_record,
 )
@@ -25,15 +26,22 @@ def _error(message: str, status: int = 400):
 @sensors_bp.get("/api/sensors")
 @api_login_required
 def list_sensors():
-    """List readings for the current user's devices, newest first."""
+    """List readings for the current user's devices, newest first.
+
+    Supports ``?device_id=<id>`` to narrow to a single device (verified to belong
+    to the current user) and ``?limit=`` / ``?offset=`` for page size.
+    """
     user = current_user(current_app)
     user_id = user["id"] if user else None
 
     limit = max(0, min(int(request.args.get("limit", 200)), 1000))
     offset = max(0, int(request.args.get("offset", 0)))
+    device_id = request.args.get("device_id", type=int)
 
-    records = list_records(current_app, limit=limit, offset=offset, user_id=user_id)
-    total = count_records(current_app, user_id=user_id)
+    records = list_records(
+        current_app, limit=limit, offset=offset, user_id=user_id, device_id=device_id
+    )
+    total = count_records(current_app, user_id=user_id, device_id=device_id)
     return jsonify(
         {
             "total": total,
@@ -42,6 +50,15 @@ def list_sensors():
             "data": records,
         }
     )
+
+
+@sensors_bp.get("/api/sensors/latest")
+@api_login_required
+def latest_sensors():
+    """Return the newest reading of each of the current user's devices."""
+    user = current_user(current_app)
+    user_id = user["id"] if user else None
+    return jsonify({"data": latest_records(current_app, user_id=user_id)})
 
 
 @sensors_bp.get("/api/sensors/<int:record_id>")

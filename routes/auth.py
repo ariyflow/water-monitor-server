@@ -16,11 +16,28 @@ from flask import (
 )
 
 from auth import hash_password, verify_password
-from db import create_user, get_user_by_id, get_user_by_username
+from db import (
+    create_api_token,
+    create_user,
+    get_user_by_id,
+    get_user_by_username,
+)
 
 auth_bp = Blueprint("auth", __name__)
 
 MIN_PASSWORD_LENGTH = 6
+
+
+def _token_response(user: dict[str, Any]) -> dict[str, Any]:
+    """Build a token-login response for a verified user."""
+    from db import API_TOKEN_TTL_SECONDS
+
+    token = create_api_token(current_app, user["id"])
+    return {
+        "token": token,
+        "expires_in": API_TOKEN_TTL_SECONDS,
+        "user": _public_user(user),
+    }
 
 
 def _error(message: str, status: int = 400):
@@ -90,6 +107,23 @@ def login():
     session["user_id"] = user["id"]
     session["username"] = user["username"]
     return jsonify({"data": _public_user(user)})
+
+
+@auth_bp.post("/api/auth/token")
+def login_token():
+    """Authenticate a user and return an API token (for native/mobile clients)."""
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        return _error("Request body must be a JSON object")
+
+    username = (payload.get("username") or "").strip()
+    password = payload.get("password") or ""
+
+    user = get_user_by_username(current_app, username)
+    if user is None or not verify_password(password, user["password_hash"]):
+        return _error("用户名或密码错误", 401)
+
+    return jsonify({"data": _token_response(user)})
 
 
 @auth_bp.post("/api/auth/logout")

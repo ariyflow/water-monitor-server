@@ -44,7 +44,18 @@ CREATE TABLE IF NOT EXISTS sensor_data (
 );
 """
 
-SCHEMA = USERS_DDL + DEVICES_DDL + SENSOR_DATA_DDL
+API_TOKENS_DDL = """
+CREATE TABLE IF NOT EXISTS api_tokens (
+    token TEXT PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at TEXT NOT NULL,
+    expires_at TEXT
+);
+"""
+
+SCHEMA = USERS_DDL + DEVICES_DDL + SENSOR_DATA_DDL + API_TOKENS_DDL
+
+API_TOKEN_TTL_SECONDS = 7 * 24 * 3600  # 7 days
 
 MEASUREMENT_FIELDS = ("ph", "temperature", "flow", "turbidity", "conductivity")
 
@@ -267,6 +278,52 @@ def ensure_user(
     return get_user_by_username(app, username) or {}
 
 
+def create_api_token(app: Any, user_id: int, ttl_seconds: int = API_TOKEN_TTL_SECONDS) -> str:
+    """Create an opaque API token for a user and return it."""
+    token = secrets.token_urlsafe(32)
+    created_at = _now()
+    expires_dt = datetime.fromtimestamp(
+        datetime.now().timestamp() + ttl_seconds
+    )
+    conn = _connect(app)
+    try:
+        conn.execute(
+            "INSERT INTO api_tokens (token, user_id, created_at, expires_at) VALUES (?, ?, ?, ?)",
+            (token, user_id, created_at, expires_dt.strftime("%Y-%m-%d %H:%M:%S")),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+    return token
+
+
+def get_user_by_api_token(app: Any, token: str) -> dict[str, Any] | None:
+    """Return the user owning a valid (non-expired) API token, or None."""
+    if not token:
+        return None
+    conn = _connect(app)
+    try:
+        row = conn.execute(
+            "SELECT u.id, u.username, u.password_hash, u.is_admin, u.created_at "
+            "FROM api_tokens t JOIN users u ON u.id = t.user_id "
+            "WHERE t.token = ? AND (t.expires_at IS NULL OR t.expires_at >= ?)",
+            (token, _now()),
+        ).fetchone()
+    finally:
+        conn.close()
+    return _row_to_dict(row)
+
+
+def revoke_api_token(app: Any, token: str) -> None:
+    """Delete an API token (e.g. on logout)."""
+    conn = _connect(app)
+    try:
+        conn.execute("DELETE FROM api_tokens WHERE token = ?", (token,))
+        conn.commit()
+    finally:
+        conn.close()
+
+
 _ADMIN_USER_COLS = "id, username, is_admin, created_at"
 
 
@@ -470,6 +527,30 @@ def list_records(
             "ORDER BY sd.id DESC LIMIT ? OFFSET ?",
             (user_id, user_id, device_id, device_id, limit, offset),
         ).fetchall()
+    finally:
+        conn.close()
+    return [_row_to_dict(row) for row in rows]
+
+
+def latest_records(
+    app: Any, user_id: int | None = None
+) -> list[dict[str, Any]]:
+    """Return the newest reading of each device, optionally scoped to a user."""
+    conn = _connect(app)
+    try:
+        if user_id is None:
+            rows = conn.execute(
+                _device_join()
+                + "WHERE sd.id = (SELECT MAX(id) FROM sensor_data WHERE device_id = sd.device_id) "
+                "ORDER BY d.id ASC"
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                _device_join()
+                + "WHERE d.user_id = ? AND sd.id = (SELECT MAX(id) FROM sensor_data WHERE device_id = sd.device_id) "
+                "ORDER BY d.id ASC",
+                (user_id,),
+            ).fetchall()
     finally:
         conn.close()
     return [_row_to_dict(row) for row in rows]

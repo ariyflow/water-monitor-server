@@ -6,9 +6,9 @@ import hashlib
 from functools import wraps
 from typing import Any, Callable, TypeVar
 
-from flask import current_app, jsonify, redirect, session, url_for
+from flask import current_app, jsonify, redirect, request, session, url_for
 
-from db import get_user_by_id
+from db import get_user_by_api_token, get_user_by_id
 
 View = TypeVar("View", bound=Callable)
 
@@ -31,6 +31,27 @@ def current_user(app: Any) -> dict[str, Any] | None:
     return get_user_by_id(app, user_id)
 
 
+def _resolve_user() -> dict[str, Any] | None:
+    """Resolve the current user from a Bearer token, else from the session.
+
+    Prefers ``Authorization: Bearer <token>`` (used by the mobile app); falls
+    back to the cookie session (used by the web UI). When a token is used the
+    session is seeded for the rest of the request so ``current_user()`` works.
+    """
+    auth = request.headers.get("Authorization", "")
+    if auth.startswith("Bearer "):
+        token = auth[len("Bearer "):].strip()
+        user = get_user_by_api_token(current_app, token)
+        if user is not None:
+            session["user_id"] = user["id"]
+            session["username"] = user["username"]
+        return user
+    user_id = session.get("user_id")
+    if user_id is None:
+        return None
+    return get_user_by_id(current_app, user_id)
+
+
 def login_required(view: View) -> View:
     """Redirect to the login page when the request is not authenticated."""
 
@@ -48,7 +69,8 @@ def api_login_required(view: View) -> View:
 
     @wraps(view)
     def wrapped(*args: Any, **kwargs: Any) -> Any:
-        if session.get("user_id") is None:
+        user = _resolve_user()
+        if user is None:
             return jsonify({"error": "Authentication required"}), 401
         return view(*args, **kwargs)
 
@@ -60,10 +82,10 @@ def api_admin_required(view: View) -> View:
 
     @wraps(view)
     def wrapped(*args: Any, **kwargs: Any) -> Any:
-        if session.get("user_id") is None:
+        user = _resolve_user()
+        if user is None:
             return jsonify({"error": "Authentication required"}), 401
-        user = get_user_by_id(current_app, session.get("user_id"))
-        if user is None or not user.get("is_admin"):
+        if not user.get("is_admin"):
             return jsonify({"error": "Admin privileges required"}), 403
         return view(*args, **kwargs)
 
