@@ -8,7 +8,7 @@ from pathlib import Path
 from flask import Flask
 
 from auth import hash_password
-from db import create_user, get_user_by_username, init_db, set_admin
+from db import ensure_user, init_db
 from routes.admin import admin_bp
 from routes.auth import auth_bp
 from routes.devices import devices_bp
@@ -22,11 +22,13 @@ ADMIN_PASSWORD = "admin54321"
 
 
 def ensure_admin_user(app: Flask) -> None:
-    """Create the admin account on first run so it exists out of the box."""
+    """Create the admin account if missing and assert its admin role.
+
+    Idempotent and concurrency-safe: it uses ``INSERT OR IGNORE`` so multiple
+    workers booting at once do not clash on the ``username`` unique constraint.
+    """
     with app.app_context():
-        if get_user_by_username(app, ADMIN_USERNAME) is None:
-            user = create_user(app, ADMIN_USERNAME, hash_password(ADMIN_PASSWORD))
-            set_admin(app, user["id"], True)
+        ensure_user(app, ADMIN_USERNAME, hash_password(ADMIN_PASSWORD), is_admin=True)
 
 
 def create_app(test_config: dict | None = None) -> Flask:

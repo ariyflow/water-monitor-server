@@ -143,11 +143,19 @@ def _migrate_legacy_sensor_data(conn: sqlite3.Connection) -> None:
 
 
 def _ensure_column(conn: sqlite3.Connection, table: str, columns_sql: str) -> None:
-    """Add a column to ``table`` if it does not already exist."""
+    """Add a column to ``table`` if it does not already exist.
+
+    Idempotent and safe under concurrent startup: if several workers migrate
+    the same database at once, a duplicate-ALTER error is simply ignored.
+    """
     existing = {row["name"] for row in conn.execute(f"PRAGMA table_info({table})")}
     col_name = columns_sql.split()[0]
     if col_name not in existing:
-        conn.execute(f"ALTER TABLE {table} ADD COLUMN {columns_sql}")
+        try:
+            conn.execute(f"ALTER TABLE {table} ADD COLUMN {columns_sql}")
+        except sqlite3.OperationalError:
+            # Another worker added the column between our check and the ALTER.
+            conn.rollback()
 
 
 def init_db(app: Any) -> None:
@@ -231,6 +239,32 @@ def set_admin(app: Any, user_id: int, is_admin: bool) -> None:
         conn.commit()
     finally:
         conn.close()
+
+
+def ensure_user(
+    app: Any, username: str, password_hash: str, is_admin: bool = False
+) -> dict[str, Any]:
+    """Create a user if absent and (re)assert the admin flag.
+
+    Uses ``INSERT OR IGNORE`` so it is safe when several workers boot at once:
+    only one actual row is inserted, others are no-ops, and the ``is_admin``
+    update is idempotent. Never overwrites an existing password.
+    """
+    conn = _connect(app)
+    try:
+        conn.execute(
+            "INSERT OR IGNORE INTO users (username, password_hash, is_admin, created_at) "
+            "VALUES (?, ?, ?, ?)",
+            (username, password_hash, 1 if is_admin else 0, _now()),
+        )
+        conn.execute(
+            "UPDATE users SET is_admin = ? WHERE username = ?",
+            (1 if is_admin else 0, username),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+    return get_user_by_username(app, username) or {}
 
 
 _ADMIN_USER_COLS = "id, username, is_admin, created_at"
