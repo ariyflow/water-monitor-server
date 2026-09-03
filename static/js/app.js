@@ -173,7 +173,7 @@ function gotoPage() {
 
 async function openSettings() {
   if (!state.selectedSerial) return;
-  settingsTitle.textContent = `阈值设置 · ${state.selectedSerial}`;
+  settingsTitle.textContent = state.selectedSerial;
   settingsForm.reset();
   try {
     const res = await apiFetch(`${SETTINGS_API}?serial=${encodeURIComponent(state.selectedSerial)}`);
