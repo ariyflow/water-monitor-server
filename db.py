@@ -72,7 +72,22 @@ CREATE TABLE IF NOT EXISTS alarms (
 );
 """
 
-SCHEMA = USERS_DDL + DEVICES_DDL + SENSOR_DATA_DDL + API_TOKENS_DDL + ALARMS_DDL
+DEVICE_SETTINGS_DDL = """
+CREATE TABLE IF NOT EXISTS device_settings (
+    device_id INTEGER PRIMARY KEY REFERENCES devices(id) ON DELETE CASCADE,
+    temp_low_c REAL NOT NULL DEFAULT 0.0,
+    temp_high_c REAL NOT NULL DEFAULT 50.0,
+    flow_high_lpm REAL NOT NULL DEFAULT 300.0,
+    ec_high_us_cm REAL NOT NULL DEFAULT 500.0,
+    turb_high_ntu REAL NOT NULL DEFAULT 40.0,
+    updated_at TEXT NOT NULL
+);
+"""
+
+SCHEMA = (
+    USERS_DDL + DEVICES_DDL + SENSOR_DATA_DDL + API_TOKENS_DDL + ALARMS_DDL
+    + DEVICE_SETTINGS_DDL
+)
 
 API_TOKEN_TTL_SECONDS = 7 * 24 * 3600  # 7 days
 
@@ -793,3 +808,95 @@ def mark_alarm_read(app: Any, alarm_id: int, user_id: int | None = None) -> bool
         return cur.rowcount > 0
     finally:
         conn.close()
+
+
+# --- Device settings (alarm thresholds) ------------------------------------
+
+
+DEFAULT_THRESHOLDS: dict[str, float] = {
+    "temp_low_c": 0.0,
+    "temp_high_c": 50.0,
+    "flow_high_lpm": 300.0,
+    "ec_high_us_cm": 500.0,
+    "turb_high_ntu": 40.0,
+}
+
+def _row_to_settings(row: sqlite3.Row) -> dict[str, Any]:
+    return dict(row)
+
+
+def get_device_settings(app: Any, device_id: int, create_default: bool = True) -> dict[str, Any]:
+    """Return a device's threshold settings, creating a defaults row if absent.
+
+    When ``create_default`` is True and no settings row exists, one is inserted
+    with the firmware's fallback values so offline/first-fetch devices receive
+    the same defaults the firmware itself uses.
+    """
+    conn = _connect(app)
+    try:
+        row = conn.execute(
+            "SELECT device_id, temp_low_c, temp_high_c, flow_high_lpm, "
+            "ec_high_us_cm, turb_high_ntu, updated_at "
+            "FROM device_settings WHERE device_id = ?",
+            (device_id,),
+        ).fetchone()
+        if row is None:
+            if not create_default:
+                return {"device_id": device_id, **DEFAULT_THRESHOLDS, "updated_at": ""}
+            conn.execute(
+                "INSERT INTO device_settings (device_id, temp_low_c, temp_high_c, "
+                "flow_high_lpm, ec_high_us_cm, turb_high_ntu, updated_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (
+                    device_id,
+                    DEFAULT_THRESHOLDS["temp_low_c"],
+                    DEFAULT_THRESHOLDS["temp_high_c"],
+                    DEFAULT_THRESHOLDS["flow_high_lpm"],
+                    DEFAULT_THRESHOLDS["ec_high_us_cm"],
+                    DEFAULT_THRESHOLDS["turb_high_ntu"],
+                    _now(),
+                ),
+            )
+            conn.commit()
+            row = conn.execute(
+                "SELECT device_id, temp_low_c, temp_high_c, flow_high_lpm, "
+                "ec_high_us_cm, turb_high_ntu, updated_at "
+                "FROM device_settings WHERE device_id = ?",
+                (device_id,),
+            ).fetchone()
+    finally:
+        conn.close()
+    return _row_to_settings(row)
+
+
+def upsert_device_settings(app: Any, device_id: int, payload: dict[str, Any]) -> dict[str, Any]:
+    """Insert or update a device's thresholds from a partial payload.
+
+    Only the five known threshold keys are honored; unknown keys are ignored.
+    Returns the full settings record afterwards.
+    """
+    keys = DEFAULT_THRESHOLDS.keys()
+    current = get_device_settings(app, device_id)
+    merged = {name: current.get(name, DEFAULT_THRESHOLDS[name]) for name in keys}
+    merged.update({name: float(payload[name]) for name in keys if name in payload})
+
+    conn = _connect(app)
+    try:
+        conn.execute(
+            "INSERT OR REPLACE INTO device_settings "
+            "(device_id, temp_low_c, temp_high_c, flow_high_lpm, ec_high_us_cm, "
+            "turb_high_ntu, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (
+                device_id,
+                merged["temp_low_c"],
+                merged["temp_high_c"],
+                merged["flow_high_lpm"],
+                merged["ec_high_us_cm"],
+                merged["turb_high_ntu"],
+                _now(),
+            ),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+    return get_device_settings(app, device_id)

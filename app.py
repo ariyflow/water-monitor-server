@@ -14,6 +14,7 @@ from routes.alarms import alarms_bp
 from routes.auth import auth_bp
 from routes.devices import devices_bp
 from routes.sensors import sensors_bp
+from routes.settings import settings_bp
 from routes.web import web_bp
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -55,6 +56,7 @@ def create_app(test_config: dict | None = None) -> Flask:
     app.register_blueprint(auth_bp)
     app.register_blueprint(devices_bp)
     app.register_blueprint(sensors_bp)
+    app.register_blueprint(settings_bp)
     app.register_blueprint(web_bp)
     app.register_blueprint(admin_bp)
     app.register_blueprint(alarms_bp)

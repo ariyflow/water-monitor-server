@@ -77,6 +77,33 @@
     </div>
   </div>
 
+  <div id="settings-modal" class="modal hidden">
+    <div class="modal-box">
+      <h2 id="settings-title">阈值设置</h2>
+      <form id="settings-form">
+        <label>温度下限 (°C，≤当前值报警)
+          <input type="number" step="any" name="temp_low_c" placeholder="0" />
+        </label>
+        <label>温度上限 (°C，>当前值报警)
+          <input type="number" step="any" name="temp_high_c" placeholder="50" />
+        </label>
+        <label>水流量上限 (L/min)
+          <input type="number" step="any" name="flow_high_lpm" placeholder="300" />
+        </label>
+        <label>电导率上限 (μS/cm)
+          <input type="number" step="any" name="ec_high_us_cm" placeholder="500" />
+        </label>
+        <label>浊度上限 (NTU)
+          <input type="number" step="any" name="turb_high_ntu" placeholder="40" />
+        </label>
+        <div class="modal-actions">
+          <button type="button" id="btn-settings-cancel" class="btn">取消</button>
+          <button type="submit" id="btn-settings-save" class="btn btn-primary">保存</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <div id="toast" class="toast hidden"></div>
 
   <script src="{{ url_for('static', filename='js/app.js') }}"></script>

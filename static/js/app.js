@@ -63,6 +63,7 @@ function renderRow(r) {
     <td>${esc(r.created_at)}</td>
     <td>
       <button class="btn btn-sm" data-edit="${r.id}">编辑</button>
+      <button class="btn btn-sm" data-settings="${esc(r.serial)}">阈值</button>
       <button class="btn btn-sm btn-danger" data-del="${r.id}">删除</button>
     </td>
   </tr>`;
@@ -137,6 +138,68 @@ async function deleteRecord(id) {
   }
 }
 
+const settingsModal = document.getElementById("settings-modal");
+const settingsForm = document.getElementById("settings-form");
+const settingsTitle = document.getElementById("settings-title");
+let settingsSerial = null;
+
+const SETTINGS_FIELDS = ["temp_low_c", "temp_high_c", "flow_high_lpm", "ec_high_us_cm", "turb_high_ntu"];
+
+async function openSettings(serial) {
+  settingsSerial = serial;
+  settingsTitle.textContent = `阈值设置 · ${serial}`;
+  settingsForm.reset();
+
+  try {
+    const res = await apiFetch(`/api/settings?serial=${encodeURIComponent(serial)}`);
+    const json = await res.json();
+    if (json.data) {
+      SETTINGS_FIELDS.forEach((f) => {
+        settingsForm[f].value = json.data[f] ?? "";
+      });
+    }
+  } catch (err) {
+    showToast("阈值加载失败", "error");
+  }
+  settingsModal.classList.remove("hidden");
+}
+
+function closeSettings() {
+  settingsModal.classList.add("hidden");
+  settingsSerial = null;
+}
+
+async function saveSettings(e) {
+  e.preventDefault();
+  if (!settingsSerial) return;
+
+  const payload = { serial: settingsSerial };
+  SETTINGS_FIELDS.forEach((f) => {
+    const v = settingsForm[f].value.trim();
+    if (v !== "") payload[f] = v;
+  });
+
+  try {
+    const res = await apiFetch("/api/settings", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}));
+      throw new Error(j.error || "保存失败");
+    }
+    showToast("阈值保存成功", "success");
+    closeSettings();
+  } catch (err) {
+    showToast(err.message || "保存失败", "error");
+  }
+}
+
+document.getElementById("btn-settings-cancel").addEventListener("click", closeSettings);
+settingsForm.addEventListener("submit", saveSettings);
+settingsModal.addEventListener("click", (e) => { if (e.target === settingsModal) closeSettings(); });
+
 document.getElementById("btn-refresh").addEventListener("click", loadData);
 document.getElementById("btn-add").addEventListener("click", () => openModal());
 
@@ -155,12 +218,15 @@ modal.addEventListener("click", (e) => { if (e.target === modal) closeModal(); }
 
 tbody.addEventListener("click", (e) => {
   const editBtn = e.target.closest("[data-edit]");
+  const settingsBtn = e.target.closest("[data-settings]");
   const delBtn = e.target.closest("[data-del]");
   if (editBtn) {
     const id = Number(editBtn.dataset.edit);
     apiFetch(`${API}/${id}`)
       .then((r) => r.json())
       .then((json) => openModal(json.data));
+  } else if (settingsBtn) {
+    openSettings(settingsBtn.dataset.settings);
   } else if (delBtn) {
     deleteRecord(Number(delBtn.dataset.del));
   }
