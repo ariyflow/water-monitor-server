@@ -17,6 +17,7 @@
     .selector label { display: block; font-size: 0.85rem; color: #5b6472; margin-bottom: 0.35rem; }
     .selector select { width: 100%; padding: 0.5rem 0.65rem; border: 1px solid #d6dce6; border-radius: 6px; font-size: 0.9rem; background: #fff; }
     .selector select:focus { outline: none; border-color: #1f6feb; }
+    .device-info { font-size: 1rem; font-weight: 600; color: #2b3445; padding-bottom: 0.5rem; white-space: nowrap; }
     #page-input { width: 70px; padding: 0.35rem 0.5rem; border: 1px solid #d6dce6; border-radius: 6px; font-size: 0.85rem; }
     #page-input:focus { outline: none; border-color: #1f6feb; }
 
@@ -53,12 +54,12 @@
         <label for="sel-device">设备</label>
         <select id="sel-device"><option value="">请选择设备</option></select>
       </div>
+      <div class="device-info" id="device-info">请选择设备</div>
       <button id="btn-settings" class="btn btn-primary" disabled>阈值设置</button>
     </section>
 
     <section class="toolbar">
       <button id="btn-refresh" class="btn btn-primary">刷新</button>
-      <span id="summary" class="muted">请选择设备</span>
       <span class="topbar-spacer"></span>
       <label class="muted" style="font-size:0.85rem;">每页
         <select id="page-size" style="padding:0.25rem 0.5rem;border-radius:6px;border:1px solid #d6dce6;">
@@ -155,6 +156,6 @@
 
   <div id="toast" class="toast hidden"></div>
 
-  <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/app.js') }}?v=2"></script>
 </body>
 </html>

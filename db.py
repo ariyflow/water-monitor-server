@@ -393,8 +393,8 @@ def delete_user(app: Any, user_id: int) -> bool:
     SQLite does not enable foreign-key ``ON DELETE CASCADE`` by default, so the
     cascade is performed explicitly inside a single transaction: the readings of
     the user's devices are removed first, then the devices, then the user.
-    Per-device settings and API tokens referencing the user are removed as well
-    so no orphaned rows remain and any prior Bearer token is revoked.
+    API tokens referencing the user are removed as well so no orphaned rows
+    remain and any prior Bearer token is revoked.
     """
     conn = _connect(app)
     try:
@@ -408,9 +408,6 @@ def delete_user(app: Any, user_id: int) -> bool:
             marks = ",".join("?" for _ in device_ids)
             conn.execute(
                 f"DELETE FROM sensor_data WHERE device_id IN ({marks})", device_ids
-            )
-            conn.execute(
-                f"DELETE FROM device_settings WHERE device_id IN ({marks})", device_ids
             )
             conn.execute(f"DELETE FROM devices WHERE id IN ({marks})", device_ids)
 

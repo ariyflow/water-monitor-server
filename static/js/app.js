@@ -4,7 +4,7 @@ const SETTINGS_API = "/api/settings";
 const selDevice = document.getElementById("sel-device");
 const btnSettings = document.getElementById("btn-settings");
 const btnRefresh = document.getElementById("btn-refresh");
-const summaryEl = document.getElementById("summary");
+const deviceInfo = document.getElementById("device-info");
 const tbody = document.getElementById("tbody");
 const pageInfoEl = document.getElementById("page-info");
 const btnPrev = document.getElementById("btn-prev");
@@ -108,10 +108,10 @@ async function loadDevices() {
     state.devices.forEach((d) => {
       const opt = document.createElement("option");
       opt.value = d.id;
-      opt.textContent = d.name ? `${d.name}（${d.serial}）` : d.serial;
+      opt.textContent = d.name || d.serial;
       selDevice.appendChild(opt);
     });
-    summaryEl.textContent = `共 ${state.devices.length} 个设备`;
+    deviceInfo.textContent = `共 ${state.devices.length} 个设备`;
     if (state.devices.length) autoSelectFirstDevice();
   } catch (err) {
     setEmpty("加载失败");
@@ -133,12 +133,12 @@ function selectDevice() {
   if (!device) {
     btnSettings.disabled = true;
     setEmpty("请选择设备");
-    summaryEl.textContent = "请选择设备";
+    deviceInfo.textContent = "请选择设备";
     return;
   }
 
   btnSettings.disabled = false;
-  summaryEl.textContent = device.name ? `${device.name}（${device.serial}）` : device.serial;
+  deviceInfo.textContent = device.name ? `${device.name}（${device.serial}）` : device.serial;
   loadRecords(1);
 }
 
