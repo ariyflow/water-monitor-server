@@ -12,6 +12,5 @@ def main() -> None:
     app = create_app()
     app.run(host=HOST, port=PORT, debug=True)
 
-
 if __name__ == "__main__":
     main()

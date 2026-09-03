@@ -53,11 +53,20 @@ def _resolve_user() -> dict[str, Any] | None:
 
 
 def login_required(view: View) -> View:
-    """Redirect to the login page when the request is not authenticated."""
+    """Redirect to the login page when the request is not authenticated.
+
+    Also invalidates a stale session whose user no longer exists (e.g. the
+    account was deleted by an admin): the cookie is cleared and the user is
+    sent back to the login page instead of being let through with ``None``.
+    """
 
     @wraps(view)
     def wrapped(*args: Any, **kwargs: Any) -> Any:
-        if session.get("user_id") is None:
+        user_id = session.get("user_id")
+        if user_id is None:
+            return redirect(url_for("auth.login_page"))
+        if get_user_by_id(current_app, user_id) is None:
+            session.clear()
             return redirect(url_for("auth.login_page"))
         return view(*args, **kwargs)
 
