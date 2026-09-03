@@ -5,11 +5,26 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>水质监测数据管理</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+  <style>
+    .wrap { max-width: 1200px; margin: 1.5rem auto 4rem; padding: 0 1rem; }
+    .toolbar { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem; flex-wrap: wrap; }
+    .muted { color: #7a8496; font-size: 0.9rem; }
+    .pager { display: flex; align-items: center; gap: 0.6rem; margin-top: 0.9rem; justify-content: flex-end; flex-wrap: wrap; }
+    .pager button:disabled { background: #eef1f5; color: #a6afbc; cursor: not-allowed; }
+    .card { background: #fff; border-radius: 10px; padding: 1rem 1.2rem; box-shadow: 0 2px 10px rgba(0,0,0,0.06); overflow-x: auto; }
+    .selectors { background: #fff; border-radius: 10px; padding: 1rem 1.2rem; margin-bottom: 1rem; box-shadow: 0 2px 10px rgba(0,0,0,0.06); display: flex; gap: 1.5rem; flex-wrap: wrap; align-items: flex-end; }
+    .selector { flex: 1; min-width: 240px; }
+    .selector label { display: block; font-size: 0.85rem; color: #5b6472; margin-bottom: 0.35rem; }
+    .selector select { width: 100%; padding: 0.5rem 0.65rem; border: 1px solid #d6dce6; border-radius: 6px; font-size: 0.9rem; background: #fff; }
+    .selector select:focus { outline: none; border-color: #1f6feb; }
+    #page-input { width: 70px; padding: 0.35rem 0.5rem; border: 1px solid #d6dce6; border-radius: 6px; font-size: 0.85rem; }
+    #page-input:focus { outline: none; border-color: #1f6feb; }
+  </style>
 </head>
 <body>
   <header class="topbar">
     <h1>水质监测数据管理</h1>
-    <span class="sub">Water Monitor Server</span>
+    <span class="sub">选择设备 → 查看数据</span>
     <span class="topbar-spacer"></span>
     <span class="topbar-user">{% if user %}{{ user.username }}{% endif %}</span>
     {% if user and user.is_admin %}
@@ -18,11 +33,26 @@
     <button id="btn-logout" class="btn btn-outline">退出登录</button>
   </header>
 
-  <main class="container">
+  <main class="wrap">
+    <section class="selectors">
+      <div class="selector">
+        <label for="sel-device">设备</label>
+        <select id="sel-device"><option value="">请选择设备</option></select>
+      </div>
+      <button id="btn-settings" class="btn btn-primary" disabled>阈值设置</button>
+    </section>
+
     <section class="toolbar">
       <button id="btn-refresh" class="btn btn-primary">刷新</button>
-      <button id="btn-add" class="btn btn-success">新增记录</button>
-      <span id="total" class="muted">共 0 条记录</span>
+      <span id="summary" class="muted">请选择设备</span>
+      <span class="topbar-spacer"></span>
+      <label class="muted" style="font-size:0.85rem;">每页
+        <select id="page-size" style="padding:0.25rem 0.5rem;border-radius:6px;border:1px solid #d6dce6;">
+          <option value="20">20</option>
+          <option value="50" selected>50</option>
+          <option value="100">100</option>
+        </select>
+      </label>
     </section>
 
     <section class="card">
@@ -37,45 +67,22 @@
             <th>浊度</th>
             <th>电导率</th>
             <th>时间戳</th>
-            <th>操作</th>
           </tr>
         </thead>
         <tbody id="tbody">
-          <tr><td colspan="9" class="empty">加载中...</td></tr>
+          <tr><td colspan="8" class="empty">请选择设备</td></tr>
         </tbody>
       </table>
+      <div class="pager">
+        <button id="btn-prev" class="btn" disabled>上一页</button>
+        <span id="page-info" class="muted">第 0 / 0 页</span>
+        <button id="btn-next" class="btn" disabled>下一页</button>
+        <span class="muted">跳至</span>
+        <input type="number" id="page-input" min="1" value="1" disabled />
+        <button id="btn-goto" class="btn" disabled>跳转</button>
+      </div>
     </section>
   </main>
-
-  <div id="modal" class="modal hidden">
-    <div class="modal-box">
-      <h2 id="modal-title">新增记录</h2>
-      <form id="modal-form">
-        <label>设备序列号 *
-          <input type="text" name="serial" required placeholder="如 ab12cd34ef56" />
-        </label>
-        <label>pH
-          <input type="text" name="ph" placeholder="如 7" />
-        </label>
-        <label>温度 (°C)
-          <input type="text" name="temperature" placeholder="如 25" />
-        </label>
-        <label>水流量
-          <input type="text" name="flow" placeholder="如 10" />
-        </label>
-        <label>浊度
-          <input type="text" name="turbidity" placeholder="如 10" />
-        </label>
-        <label>电导率
-          <input type="text" name="conductivity" placeholder="如 100" />
-        </label>
-        <div class="modal-actions">
-          <button type="button" id="btn-cancel" class="btn">取消</button>
-          <button type="submit" id="btn-save" class="btn btn-primary">保存</button>
-        </div>
-      </form>
-    </div>
-  </div>
 
   <div id="settings-modal" class="modal hidden">
     <div class="modal-box">

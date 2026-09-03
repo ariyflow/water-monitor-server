@@ -1,24 +1,39 @@
-const API = "/api/sensors";
+const DEVICES_API = "/api/devices";
+const SETTINGS_API = "/api/settings";
 
-const state = { editingId: null };
-
-async function apiFetch(url, options = {}) {
-  const res = await fetch(url, options);
-  if (res.status === 401) {
-    window.location.href = "/login";
-    throw new Error("Unauthorized");
-  }
-  return res;
-}
-
+const selDevice = document.getElementById("sel-device");
+const btnSettings = document.getElementById("btn-settings");
+const btnRefresh = document.getElementById("btn-refresh");
+const summaryEl = document.getElementById("summary");
 const tbody = document.getElementById("tbody");
-const totalEl = document.getElementById("total");
-
-const modal = document.getElementById("modal");
-const modalTitle = document.getElementById("modal-title");
-const modalForm = document.getElementById("modal-form");
-
+const pageInfoEl = document.getElementById("page-info");
+const btnPrev = document.getElementById("btn-prev");
+const btnNext = document.getElementById("btn-next");
+const pageSizeEl = document.getElementById("page-size");
+const pageInput = document.getElementById("page-input");
+const btnGoto = document.getElementById("btn-goto");
 const toast = document.getElementById("toast");
+
+const settingsModal = document.getElementById("settings-modal");
+const settingsForm = document.getElementById("settings-form");
+const settingsTitle = document.getElementById("settings-title");
+const btnSettingsCancel = document.getElementById("btn-settings-cancel");
+
+const SETTINGS_FIELDS = ["temp_low_c", "temp_high_c", "flow_high_lpm", "ec_high_us_cm", "turb_high_ntu"];
+const COLS = 8;
+
+const state = {
+  devices: [],
+  selectedDeviceId: null,
+  selectedSerial: null,
+  page: 1,
+  pageSize: Number(pageSizeEl.value),
+  total: 0,
+};
+
+function totalPages() {
+  return Math.max(1, Math.ceil(state.total / state.pageSize));
+}
 
 function showToast(message, type = "info") {
   toast.textContent = message;
@@ -34,25 +49,36 @@ function esc(value) {
   }[c]));
 }
 
-async function loadData() {
-  tbody.innerHTML = `<tr><td colspan="9" class="empty">加载中...</td></tr>`;
-  try {
-    const res = await apiFetch(API);
-    const json = await res.json();
-    totalEl.textContent = `共 ${json.total} 条记录`;
-    if (!json.data.length) {
-      tbody.innerHTML = `<tr><td colspan="9" class="empty">暂无数据</td></tr>`;
-      return;
-    }
-    tbody.innerHTML = json.data.map(renderRow).join("");
-  } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="9" class="empty">加载失败</td></tr>`;
-    showToast("加载失败", "error");
+async function apiFetch(url, options = {}) {
+  const res = await fetch(url, options);
+  if (res.status === 401) {
+    window.location.href = "/login";
+    throw new Error("Unauthorized");
   }
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error || "请求失败");
+  }
+  return res;
 }
 
-function renderRow(r) {
-  return `<tr>
+function setEmpty(text) {
+  tbody.innerHTML = `<tr><td colspan="${COLS}" class="empty">${text}</td></tr>`;
+  pageInfoEl.textContent = "第 0 / 0 页";
+  btnPrev.disabled = true;
+  btnNext.disabled = true;
+  pageInput.value = 1;
+  pageInput.max = 1;
+  pageInput.disabled = true;
+  btnGoto.disabled = true;
+}
+
+function renderRows(records) {
+  if (!records.length) {
+    setEmpty("暂无数据");
+    return;
+  }
+  tbody.innerHTML = records.map((r) => `<tr>
     <td>${esc(r.id)}</td>
     <td>${esc(r.serial || "—")}</td>
     <td>${esc(r.ph)}</td>
@@ -61,102 +87,99 @@ function renderRow(r) {
     <td>${esc(r.turbidity)}</td>
     <td>${esc(r.conductivity)}</td>
     <td>${esc(r.created_at)}</td>
-    <td>
-      <button class="btn btn-sm" data-edit="${r.id}">编辑</button>
-      <button class="btn btn-sm" data-settings="${esc(r.serial)}">阈值</button>
-      <button class="btn btn-sm btn-danger" data-del="${r.id}">删除</button>
-    </td>
-  </tr>`;
+  </tr>`).join("");
+  pageInfoEl.textContent = `第 ${state.page} / ${totalPages()} 页（共 ${state.total} 条）`;
+  btnPrev.disabled = state.page <= 1;
+  btnNext.disabled = state.page >= totalPages();
+  pageInput.value = state.page;
+  pageInput.max = totalPages();
+  pageInput.disabled = false;
+  btnGoto.disabled = false;
 }
 
-function openModal(record = null) {
-  state.editingId = record ? record.id : null;
-  modalTitle.textContent = record ? "编辑记录" : "新增记录";
-  modalForm.reset();
-  if (record) {
-    modalForm.serial.value = record.serial || "";
-    modalForm.ph.value = record.ph || "";
-    modalForm.temperature.value = record.temperature || "";
-    modalForm.flow.value = record.flow || "";
-    modalForm.turbidity.value = record.turbidity || "";
-    modalForm.conductivity.value = record.conductivity || "";
+async function loadDevices() {
+  setEmpty("加载中...");
+  btnSettings.disabled = true;
+  selDevice.innerHTML = `<option value="">请选择设备</option>`;
+  try {
+    const res = await apiFetch(DEVICES_API);
+    const json = await res.json();
+    state.devices = json.data || [];
+    state.devices.forEach((d) => {
+      const opt = document.createElement("option");
+      opt.value = d.id;
+      opt.textContent = d.name ? `${d.name}（${d.serial}）` : d.serial;
+      selDevice.appendChild(opt);
+    });
+    summaryEl.textContent = `共 ${state.devices.length} 个设备`;
+    if (state.devices.length) autoSelectFirstDevice();
+  } catch (err) {
+    setEmpty("加载失败");
+    showToast("加载失败", "error");
   }
-  modal.classList.remove("hidden");
 }
 
-function closeModal() { modal.classList.add("hidden"); }
-
-function formPayload() {
-  return {
-    serial: modalForm.serial.value.trim(),
-    ph: modalForm.ph.value.trim(),
-    temperature: modalForm.temperature.value.trim(),
-    flow: modalForm.flow.value.trim(),
-    turbidity: modalForm.turbidity.value.trim(),
-    conductivity: modalForm.conductivity.value.trim(),
-  };
+function autoSelectFirstDevice() {
+  selDevice.value = state.devices[0].id;
+  selectDevice();
 }
 
-async function saveRecord(e) {
-  e.preventDefault();
-  const payload = formPayload();
-  if (!payload.serial) {
-    showToast("设备序列号不能为空", "error");
+function selectDevice() {
+  const deviceId = Number(selDevice.value);
+  const device = state.devices.find((d) => d.id === deviceId) || null;
+  state.selectedDeviceId = deviceId || null;
+  state.selectedSerial = device ? device.serial : null;
+
+  if (!device) {
+    btnSettings.disabled = true;
+    setEmpty("请选择设备");
+    summaryEl.textContent = "请选择设备";
     return;
   }
+
+  btnSettings.disabled = false;
+  summaryEl.textContent = device.name ? `${device.name}（${device.serial}）` : device.serial;
+  loadRecords(1);
+}
+
+async function loadRecords(page) {
+  state.page = page || 1;
+  if (!state.selectedDeviceId) {
+    setEmpty("请选择设备");
+    return;
+  }
+  setEmpty("加载中...");
+  const offset = (state.page - 1) * state.pageSize;
+  const url = `/api/sensors?device_id=${state.selectedDeviceId}&limit=${state.pageSize}&offset=${offset}`;
   try {
-    if (state.editingId) {
-      await apiFetch(`${API}/${state.editingId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      showToast("更新成功", "success");
-    } else {
-      await apiFetch(API, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      showToast("新增成功", "success");
-    }
-    closeModal();
-    loadData();
+    const res = await apiFetch(url);
+    const json = await res.json();
+    state.total = json.total;
+    state.page = Math.floor(json.offset / state.pageSize) + 1;
+    renderRows(json.data || []);
   } catch (err) {
-    showToast("保存失败", "error");
+    setEmpty("加载失败");
+    showToast("加载失败", "error");
   }
 }
 
-async function deleteRecord(id) {
-  if (!confirm("确定删除该记录吗？")) return;
-  try {
-    await apiFetch(`${API}/${id}`, { method: "DELETE" });
-    showToast("删除成功", "success");
-    loadData();
-  } catch (err) {
-    showToast("删除失败", "error");
-  }
+function gotoPage() {
+  if (!state.selectedDeviceId) return;
+  let page = parseInt(pageInput.value, 10);
+  if (isNaN(page) || page < 1) page = 1;
+  page = Math.min(page, totalPages());
+  loadRecords(page);
 }
 
-const settingsModal = document.getElementById("settings-modal");
-const settingsForm = document.getElementById("settings-form");
-const settingsTitle = document.getElementById("settings-title");
-let settingsSerial = null;
-
-const SETTINGS_FIELDS = ["temp_low_c", "temp_high_c", "flow_high_lpm", "ec_high_us_cm", "turb_high_ntu"];
-
-async function openSettings(serial) {
-  settingsSerial = serial;
-  settingsTitle.textContent = `阈值设置 · ${serial}`;
+async function openSettings() {
+  if (!state.selectedSerial) return;
+  settingsTitle.textContent = `阈值设置 · ${state.selectedSerial}`;
   settingsForm.reset();
-
   try {
-    const res = await apiFetch(`/api/settings?serial=${encodeURIComponent(serial)}`);
+    const res = await apiFetch(`${SETTINGS_API}?serial=${encodeURIComponent(state.selectedSerial)}`);
     const json = await res.json();
     if (json.data) {
-      SETTINGS_FIELDS.forEach((f) => {
-        settingsForm[f].value = json.data[f] ?? "";
-      });
+      SETTINGS_FIELDS.forEach((f) => { settingsForm[f].value = json.data[f] ?? ""; });
     }
   } catch (err) {
     showToast("阈值加载失败", "error");
@@ -166,29 +189,22 @@ async function openSettings(serial) {
 
 function closeSettings() {
   settingsModal.classList.add("hidden");
-  settingsSerial = null;
 }
 
 async function saveSettings(e) {
   e.preventDefault();
-  if (!settingsSerial) return;
-
-  const payload = { serial: settingsSerial };
+  if (!state.selectedSerial) return;
+  const payload = { serial: state.selectedSerial };
   SETTINGS_FIELDS.forEach((f) => {
     const v = settingsForm[f].value.trim();
     if (v !== "") payload[f] = v;
   });
-
   try {
-    const res = await apiFetch("/api/settings", {
+    const res = await apiFetch(SETTINGS_API, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
-    if (!res.ok) {
-      const j = await res.json().catch(() => ({}));
-      throw new Error(j.error || "保存失败");
-    }
     showToast("阈值保存成功", "success");
     closeSettings();
   } catch (err) {
@@ -196,40 +212,28 @@ async function saveSettings(e) {
   }
 }
 
-document.getElementById("btn-settings-cancel").addEventListener("click", closeSettings);
+selDevice.addEventListener("change", selectDevice);
+btnRefresh.addEventListener("click", () => loadRecords(state.page));
+btnSettings.addEventListener("click", openSettings);
+pageSizeEl.addEventListener("change", () => {
+  state.pageSize = Number(pageSizeEl.value);
+  loadRecords(1);
+});
+btnPrev.addEventListener("click", () => loadRecords(state.page - 1));
+btnNext.addEventListener("click", () => loadRecords(state.page + 1));
+btnGoto.addEventListener("click", gotoPage);
+pageInput.addEventListener("keydown", (e) => { if (e.key === "Enter") gotoPage(); });
+
+btnSettingsCancel.addEventListener("click", closeSettings);
 settingsForm.addEventListener("submit", saveSettings);
 settingsModal.addEventListener("click", (e) => { if (e.target === settingsModal) closeSettings(); });
-
-document.getElementById("btn-refresh").addEventListener("click", loadData);
-document.getElementById("btn-add").addEventListener("click", () => openModal());
 
 const btnLogout = document.getElementById("btn-logout");
 if (btnLogout) {
   btnLogout.addEventListener("click", async () => {
-    try {
-      await apiFetch("/api/auth/logout", { method: "POST" });
-    } catch (err) {}
+    try { await apiFetch("/api/auth/logout", { method: "POST" }); } catch (err) {}
     window.location.href = "/login";
   });
 }
-document.getElementById("btn-cancel").addEventListener("click", closeModal);
-modalForm.addEventListener("submit", saveRecord);
-modal.addEventListener("click", (e) => { if (e.target === modal) closeModal(); });
 
-tbody.addEventListener("click", (e) => {
-  const editBtn = e.target.closest("[data-edit]");
-  const settingsBtn = e.target.closest("[data-settings]");
-  const delBtn = e.target.closest("[data-del]");
-  if (editBtn) {
-    const id = Number(editBtn.dataset.edit);
-    apiFetch(`${API}/${id}`)
-      .then((r) => r.json())
-      .then((json) => openModal(json.data));
-  } else if (settingsBtn) {
-    openSettings(settingsBtn.dataset.settings);
-  } else if (delBtn) {
-    deleteRecord(Number(delBtn.dataset.del));
-  }
-});
-
-loadData();
+loadDevices();
