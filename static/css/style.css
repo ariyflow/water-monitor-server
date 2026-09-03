@@ -8,7 +8,7 @@ body {
 }
 
 .topbar {
-  background: #1f6feb;
+  background: #91b5ea;
   color: #fff;
   padding: 1rem 2rem;
   display: flex;
@@ -111,7 +111,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(160deg, #1f6feb, #7b5cff);
+  background: linear-gradient(160deg, #aac5ee, #95c8f2);
   padding: 1rem;
 }
 .auth-box {
