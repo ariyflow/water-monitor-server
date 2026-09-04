@@ -472,6 +472,28 @@ def get_device_by_serial(app: Any, serial: str) -> dict[str, Any] | None:
     return _row_to_dict(row)
 
 
+def get_device_by_deviceid(
+    app: Any, user_id: int, deviceid: str
+) -> dict[str, Any] | None:
+    """Return a user's device matching a (legacy) ``deviceid``.
+
+    A physical device re-provisioning with the same ``deviceid`` should reuse
+    its existing serial rather than spawn a duplicate row. The deviceid is
+    stored in the ``name`` column (legacy) and also matches ``serial`` (e.g.
+    the unbound ``deviceid`` fallback that was renamed during migration).
+    """
+    conn = _connect(app)
+    try:
+        row = conn.execute(
+            "SELECT id, user_id, serial, name, created_at FROM devices "
+            "WHERE user_id = ? AND (name = ? OR serial = ?) ORDER BY id DESC LIMIT 1",
+            (user_id, deviceid, deviceid),
+        ).fetchone()
+    finally:
+        conn.close()
+    return _row_to_dict(row)
+
+
 def list_devices(app: Any, user_id: int | None = None) -> list[dict[str, Any]]:
     """Return devices, optionally filtered by the owning user."""
     conn = _connect(app)

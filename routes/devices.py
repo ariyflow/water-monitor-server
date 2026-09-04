@@ -8,6 +8,7 @@ from auth import api_login_required
 from db import (
     create_device,
     generate_serial,
+    get_device_by_deviceid,
     get_device_by_serial,
     get_user_by_username,
     list_devices,
@@ -37,15 +38,21 @@ def _device_payload(device: dict, username: str | None = None) -> dict:
 def assign_device():
     """Generate a serial and bind a new device to the given username.
 
-    Body: {"username": "alice", "name": "optional-remark"}
+    Body: {"username": "alice", "deviceid": "optional-identity", "name": "optional-remark"}
     The 6-byte serial is returned to the caller; the device then stores it and
     reports sensor data using that serial.
+
+    Idempotent by ``deviceid``: a physical device re-provisioning with the same
+    ``deviceid`` (stored in the legacy ``name`` column) reuses its existing
+    serial instead of minting a duplicate, while still allowing one username to
+    own multiple distinct devices.
     """
     payload = request.get_json(silent=True)
     if not isinstance(payload, dict):
         return _error("Request body must be a JSON object")
 
     username = (payload.get("username") or "").strip()
+    deviceid = (payload.get("deviceid") or "").strip()
     name = (payload.get("name") or "").strip()
 
     if not username:
@@ -55,8 +62,15 @@ def assign_device():
     if user is None:
         return _error("用户不存在", 404)
 
+    if deviceid:
+        existing = get_device_by_deviceid(current_app, user["id"], deviceid)
+        if existing is not None:
+            return jsonify({"data": _device_payload(existing, username)}), 200
+
     serial = generate_serial()
-    device = create_device(current_app, user["id"], serial=serial, name=name)
+    device = create_device(
+        current_app, user["id"], serial=serial, name=deviceid or name
+    )
     return jsonify({"data": _device_payload(device, username)}), 201
 
 
