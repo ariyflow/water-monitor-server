@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sqlite3
 from typing import Any
 
 from flask import (
@@ -83,7 +84,15 @@ def register():
     if get_user_by_username(current_app, username):
         return _error("用户名已存在", 409)
 
-    user = create_user(current_app, username, hash_password(password))
+    # The check above is a race (TOCTOU) with concurrent registrations: two
+    # requests for the same username can both pass "not exists", then the second
+    # INSERT hits the UNIQUE constraint. Catch it and report a clean 409 instead
+    # of an unhandled IntegrityError that would surface as a 500.
+    try:
+        user = create_user(current_app, username, hash_password(password))
+    except sqlite3.IntegrityError:
+        return _error("用户名已存在", 409)
+
     session["user_id"] = user["id"]
     session["username"] = user["username"]
     return jsonify({"data": _public_user(user)}), 201
