@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import secrets
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 
 USERS_DDL = """
@@ -693,6 +693,52 @@ def count_records(
         return int(row["c"])
     finally:
         conn.close()
+
+def interval_records(
+    app: Any,
+    device_id: int,
+    hours: int = 24,
+) -> list[dict[str, Any]]:
+    """Return one averaged reading per minute for a device over the last ``hours``.
+
+    The device uploads once per second, so a full day would be ~86k rows. This
+    bucketing groups the raw readings by the minute part of ``created_at``
+    (``YYYY-MM-DD HH:MM``) and averages each measurement over the non-empty
+    values within that minute. Buckets are ordered oldest first, matching the
+    ``sensor_data`` conventions (measurements as strings, ``created_at`` first).
+    """
+    cutoff = (datetime.now() - timedelta(hours=hours)).strftime("%Y-%m-%d %H:%M:%S")
+    conn = _connect(app)
+    try:
+        rows = conn.execute(
+            """
+            SELECT
+                sd.device_id,
+                substr(sd.created_at, 1, 16) AS minute,
+                AVG(CASE WHEN sd.ph != '' THEN CAST(sd.ph AS REAL) END) AS ph,
+                AVG(CASE WHEN sd.temperature != '' THEN CAST(sd.temperature AS REAL) END) AS temperature,
+                AVG(CASE WHEN sd.flow != '' THEN CAST(sd.flow AS REAL) END) AS flow,
+                AVG(CASE WHEN sd.turbidity != '' THEN CAST(sd.turbidity AS REAL) END) AS turbidity,
+                AVG(CASE WHEN sd.conductivity != '' THEN CAST(sd.conductivity AS REAL) END) AS conductivity
+            FROM sensor_data sd
+            WHERE sd.device_id = ? AND sd.created_at >= ?
+            GROUP BY minute
+            ORDER BY minute ASC
+            """,
+            (device_id, cutoff),
+        ).fetchall()
+    finally:
+        conn.close()
+    result: list[dict[str, Any]] = []
+    for row in rows:
+        d = dict(row)
+        d["created_at"] = d.pop("minute")
+        for field in MEASUREMENT_FIELDS:
+            value = d.get(field)
+            d[field] = "" if value is None else f"{value:g}"
+        result.append(d)
+    return result
+
 
 # --- Alarms -----------------------------------------------------------
 

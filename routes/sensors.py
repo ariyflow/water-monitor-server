@@ -9,8 +9,10 @@ from db import (
     count_records,
     create_record,
     delete_record,
+    get_device_by_id,
     get_device_by_serial,
     get_record,
+    interval_records,
     latest_records,
     list_records,
     update_record,
@@ -59,6 +61,34 @@ def latest_sensors():
     user = current_user(current_app)
     user_id = user["id"] if user else None
     return jsonify({"data": latest_records(current_app, user_id=user_id)})
+
+
+@sensors_bp.get("/api/sensors/interval")
+@api_login_required
+def interval_sensors():
+    """Return per-minute averaged readings for one device over a time window.
+
+    Devices upload every second, so a full day is ~86k raw rows. This
+    downsampled view collapses them into one reading per minute so a client
+    (e.g. an on-device AI summariser) can analyse the recent history without
+    pulling or sending a huge payload.
+
+    Query params: ``device_id`` (required, must belong to the current user),
+    ``hours`` (default 24, capped at 720 = 30 days).
+    """
+    user = current_user(current_app)
+    user_id = user["id"] if user else None
+    device_id = request.args.get("device_id", type=int)
+    if device_id is None:
+        return _error("Field 'device_id' is required")
+
+    device = get_device_by_id(current_app, device_id)
+    if device is None or device.get("user_id") != user_id:
+        return _error("设备不存在或无权访问", 404)
+
+    hours = max(1, min(int(request.args.get("hours", 24)), 24 * 30))
+    records = interval_records(current_app, device_id, hours=hours)
+    return jsonify({"data": records})
 
 
 @sensors_bp.get("/api/sensors/<int:record_id>")
