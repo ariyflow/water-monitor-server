@@ -77,7 +77,7 @@ CREATE TABLE IF NOT EXISTS device_settings (
     device_id INTEGER PRIMARY KEY REFERENCES devices(id) ON DELETE CASCADE,
     temp_low_c REAL NOT NULL DEFAULT 0.0,
     temp_high_c REAL NOT NULL DEFAULT 50.0,
-    flow_high_lpm REAL NOT NULL DEFAULT 300.0,
+    flow_high_lpm REAL NOT NULL DEFAULT 20.0,
     ec_high_us_cm REAL NOT NULL DEFAULT 500.0,
     turb_high_ntu REAL NOT NULL DEFAULT 40.0,
     ph_low REAL NOT NULL DEFAULT 4.0,
@@ -215,6 +215,11 @@ def init_db(app: Any) -> None:
         _ensure_column(conn, "users", "is_admin INTEGER NOT NULL DEFAULT 0")
         _ensure_column(conn, "device_settings", "ph_low REAL NOT NULL DEFAULT 4.0")
         _ensure_column(conn, "device_settings", "ph_high REAL NOT NULL DEFAULT 10.0")
+        # 旧默认流量阈值 300 L/min 超出 YF-S201 量程(1~30 L/min), 此处把仍保留旧默认值的行
+        # 修正为新默认 20 L/min; 仅影响仍等于旧默认值的行, 不覆盖用户已改的其它取值。
+        conn.execute(
+            "UPDATE device_settings SET flow_high_lpm = 20.0 WHERE flow_high_lpm = 300.0"
+        )
         conn.commit()
     finally:
         conn.close()
@@ -888,7 +893,7 @@ def mark_alarm_read(app: Any, alarm_id: int, user_id: int | None = None) -> bool
 DEFAULT_THRESHOLDS: dict[str, float] = {
     "temp_low_c": 0.0,
     "temp_high_c": 50.0,
-    "flow_high_lpm": 300.0,
+    "flow_high_lpm": 20.0,
     "ec_high_us_cm": 500.0,
     "turb_high_ntu": 40.0,
     "ph_low": 4.0,
