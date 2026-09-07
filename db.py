@@ -226,8 +226,16 @@ def init_db(app: Any) -> None:
 
 
 def _clean_measurements(payload: dict[str, Any]) -> dict[str, str]:
-    """Keep only measurement fields, mapping absent/None values to empty string."""
-    return {field: payload.get(field) or "" for field in MEASUREMENT_FIELDS}
+    """Keep only measurement fields, mapping missing/None values to empty string.
+
+    Note: 数值 0 是合法读数(如流量为 0、浊度为 0), 必须保留; 仅 None/缺失才映射为空串,
+    否则用 ``or ""`` 会把数值 0 误判为缺失, 导致前端显示"数据缺失"。
+    """
+    result = {}
+    for field in MEASUREMENT_FIELDS:
+        val = payload.get(field)
+        result[field] = "" if val is None else str(val)
+    return result
 
 
 # --- Users -----------------------------------------------------------------
