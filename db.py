@@ -455,6 +455,25 @@ def create_device(
     return get_device_by_id(app, device_id) or {}
 
 
+def delete_device(app: Any, device_id: int) -> bool:
+    """Delete a device together with its readings, alarms and settings.
+
+    SQLite does not enable foreign-key ``ON DELETE CASCADE`` by default, so the
+    cascade is performed explicitly inside a single transaction. Used by the
+    device self-delete (reset) flow; the owning user account is left intact.
+    """
+    conn = _connect(app)
+    try:
+        conn.execute("DELETE FROM sensor_data WHERE device_id = ?", (device_id,))
+        conn.execute("DELETE FROM alarms WHERE device_id = ?", (device_id,))
+        conn.execute("DELETE FROM device_settings WHERE device_id = ?", (device_id,))
+        cur = conn.execute("DELETE FROM devices WHERE id = ?", (device_id,))
+        conn.commit()
+        return cur.rowcount > 0
+    finally:
+        conn.close()
+
+
 def get_device_by_id(app: Any, device_id: int) -> dict[str, Any] | None:
     """Return a device by id, or None if it does not exist."""
     conn = _connect(app)

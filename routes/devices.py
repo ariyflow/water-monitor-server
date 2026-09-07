@@ -7,6 +7,7 @@ from flask import Blueprint, current_app, jsonify, request, session
 from auth import api_login_required
 from db import (
     create_device,
+    delete_device,
     generate_serial,
     get_device_by_deviceid,
     get_device_by_serial,
@@ -99,3 +100,32 @@ def get_device_route(serial: str):
     if device is None:
         return _error("设备不存在", 404)
     return jsonify({"data": _device_payload(device)})
+
+
+@devices_bp.delete("/api/devices/<serial>")
+def delete_device_route(serial: str):
+    """Device self-delete (reset): remove the device and all its data.
+
+    The device identifies itself by its serial in the URL and authenticates by
+    sending its owning username in the JSON body; the server deletes only when
+    the device belongs to that username. No user session is required, matching
+    the sensor/alarm reporting model.
+    """
+    payload = request.get_json(silent=True)
+    username = ""
+    if isinstance(payload, dict):
+        username = (payload.get("username") or "").strip()
+    if not username:
+        return _error("Field 'username' is required")
+
+    device = get_device_by_serial(current_app, serial)
+    if device is None:
+        return _error("设备不存在或序列号无效", 404)
+
+    user = get_user_by_username(current_app, username)
+    if user is None or user["id"] != device["user_id"]:
+        return _error("用户名与设备不匹配", 403)
+
+    if not delete_device(current_app, device["id"]):
+        return _error("设备不存在", 404)
+    return jsonify({"message": "设备已删除"})
