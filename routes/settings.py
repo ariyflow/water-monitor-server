@@ -32,6 +32,8 @@ def _settings_payload(settings: dict, serial: str) -> dict:
         "flow_high_lpm": settings["flow_high_lpm"],
         "ec_high_us_cm": settings["ec_high_us_cm"],
         "turb_high_ntu": settings["turb_high_ntu"],
+        "ph_low": settings["ph_low"],
+        "ph_high": settings["ph_high"],
     }
     if settings.get("updated_at"):
         payload["updated_at"] = settings["updated_at"]
@@ -101,6 +103,13 @@ def update_settings():
         merged_high = parsed["temp_high_c"] if "temp_high_c" in parsed else current["temp_high_c"]
         if merged_low >= merged_high:
             return _error("温度下限必须小于上限")
+
+    if "ph_low" in parsed or "ph_high" in parsed:
+        current = get_device_settings(current_app, device["id"])
+        merged_low = parsed["ph_low"] if "ph_low" in parsed else current["ph_low"]
+        merged_high = parsed["ph_high"] if "ph_high" in parsed else current["ph_high"]
+        if merged_low >= merged_high:
+            return _error("PH 下限必须小于上限")
 
     settings = upsert_device_settings(current_app, device["id"], parsed)
     return jsonify({"data": _settings_payload(settings, serial)})

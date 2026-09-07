@@ -80,6 +80,8 @@ CREATE TABLE IF NOT EXISTS device_settings (
     flow_high_lpm REAL NOT NULL DEFAULT 300.0,
     ec_high_us_cm REAL NOT NULL DEFAULT 500.0,
     turb_high_ntu REAL NOT NULL DEFAULT 40.0,
+    ph_low REAL NOT NULL DEFAULT 4.0,
+    ph_high REAL NOT NULL DEFAULT 10.0,
     updated_at TEXT NOT NULL
 );
 """
@@ -211,6 +213,8 @@ def init_db(app: Any) -> None:
         _migrate_legacy_sensor_data(conn)
         conn.executescript(SCHEMA)
         _ensure_column(conn, "users", "is_admin INTEGER NOT NULL DEFAULT 0")
+        _ensure_column(conn, "device_settings", "ph_low REAL NOT NULL DEFAULT 4.0")
+        _ensure_column(conn, "device_settings", "ph_high REAL NOT NULL DEFAULT 10.0")
         conn.commit()
     finally:
         conn.close()
@@ -887,6 +891,8 @@ DEFAULT_THRESHOLDS: dict[str, float] = {
     "flow_high_lpm": 300.0,
     "ec_high_us_cm": 500.0,
     "turb_high_ntu": 40.0,
+    "ph_low": 4.0,
+    "ph_high": 10.0,
 }
 
 def _row_to_settings(row: sqlite3.Row) -> dict[str, Any]:
@@ -904,7 +910,7 @@ def get_device_settings(app: Any, device_id: int, create_default: bool = True) -
     try:
         row = conn.execute(
             "SELECT device_id, temp_low_c, temp_high_c, flow_high_lpm, "
-            "ec_high_us_cm, turb_high_ntu, updated_at "
+            "ec_high_us_cm, turb_high_ntu, ph_low, ph_high, updated_at "
             "FROM device_settings WHERE device_id = ?",
             (device_id,),
         ).fetchone()
@@ -913,8 +919,8 @@ def get_device_settings(app: Any, device_id: int, create_default: bool = True) -
                 return {"device_id": device_id, **DEFAULT_THRESHOLDS, "updated_at": ""}
             conn.execute(
                 "INSERT INTO device_settings (device_id, temp_low_c, temp_high_c, "
-                "flow_high_lpm, ec_high_us_cm, turb_high_ntu, updated_at) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                "flow_high_lpm, ec_high_us_cm, turb_high_ntu, ph_low, ph_high, updated_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     device_id,
                     DEFAULT_THRESHOLDS["temp_low_c"],
@@ -922,13 +928,15 @@ def get_device_settings(app: Any, device_id: int, create_default: bool = True) -
                     DEFAULT_THRESHOLDS["flow_high_lpm"],
                     DEFAULT_THRESHOLDS["ec_high_us_cm"],
                     DEFAULT_THRESHOLDS["turb_high_ntu"],
+                    DEFAULT_THRESHOLDS["ph_low"],
+                    DEFAULT_THRESHOLDS["ph_high"],
                     _now(),
                 ),
             )
             conn.commit()
             row = conn.execute(
                 "SELECT device_id, temp_low_c, temp_high_c, flow_high_lpm, "
-                "ec_high_us_cm, turb_high_ntu, updated_at "
+                "ec_high_us_cm, turb_high_ntu, ph_low, ph_high, updated_at "
                 "FROM device_settings WHERE device_id = ?",
                 (device_id,),
             ).fetchone()
@@ -940,7 +948,7 @@ def get_device_settings(app: Any, device_id: int, create_default: bool = True) -
 def upsert_device_settings(app: Any, device_id: int, payload: dict[str, Any]) -> dict[str, Any]:
     """Insert or update a device's thresholds from a partial payload.
 
-    Only the five known threshold keys are honored; unknown keys are ignored.
+    Only the known threshold keys are honored; unknown keys are ignored.
     Returns the full settings record afterwards.
     """
     keys = DEFAULT_THRESHOLDS.keys()
@@ -953,7 +961,8 @@ def upsert_device_settings(app: Any, device_id: int, payload: dict[str, Any]) ->
         conn.execute(
             "INSERT OR REPLACE INTO device_settings "
             "(device_id, temp_low_c, temp_high_c, flow_high_lpm, ec_high_us_cm, "
-            "turb_high_ntu, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            "turb_high_ntu, ph_low, ph_high, updated_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 device_id,
                 merged["temp_low_c"],
@@ -961,6 +970,8 @@ def upsert_device_settings(app: Any, device_id: int, payload: dict[str, Any]) ->
                 merged["flow_high_lpm"],
                 merged["ec_high_us_cm"],
                 merged["turb_high_ntu"],
+                merged["ph_low"],
+                merged["ph_high"],
                 _now(),
             ),
         )

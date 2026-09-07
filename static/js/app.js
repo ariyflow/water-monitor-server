@@ -19,7 +19,7 @@ const settingsForm = document.getElementById("settings-form");
 const settingsTitle = document.getElementById("settings-title");
 const btnSettingsCancel = document.getElementById("btn-settings-cancel");
 
-const SETTINGS_FIELDS = ["temp_low_c", "temp_high_c", "flow_high_lpm", "ec_high_us_cm", "turb_high_ntu"];
+const SETTINGS_FIELDS = ["temp_low_c", "temp_high_c", "flow_high_lpm", "ec_high_us_cm", "turb_high_ntu", "ph_low", "ph_high"];
 const COLS = 8;
 
 const state = {

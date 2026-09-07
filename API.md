@@ -197,7 +197,7 @@
 
 ## 3.5 阈值设置模块（Settings）
 
-设备默认用固件内置宏作为报警阈值；设备上电后可从服务器拉取各设备的独立阈值（`GET /api/settings`），服务器端允许设备所属用户编辑（`PUT /api/settings`）。未配置任何阈值时按固件默认值返回（温度 0~50℃、流量 300、电导率 500、浊度 40）。
+设备默认用固件内置宏作为报警阈值；设备上电后可从服务器拉取各设备的独立阈值（`GET /api/settings`），服务器端允许设备所属用户编辑（`PUT /api/settings`）。未配置任何阈值时按固件默认值返回（温度 0~50℃、流量 300、电导率 500、浊度 40、PH 4.0~10.0）。
 
 ### `GET /api/settings`
 - **认证**：**不需要**（设备拉取）。
@@ -207,6 +207,7 @@
   ```json
   {"data": {"serial": "e7980eab5386", "temp_low_c": 0.0, "temp_high_c": 50.0,
             "flow_high_lpm": 300.0, "ec_high_us_cm": 500.0, "turb_high_ntu": 40.0,
+            "ph_low": 4.0, "ph_high": 10.0,
             "updated_at": "2026-09-01 16:40:00"}}
   ```
 - **错误**：`404` `{"error": "设备不存在或序列号无效"}`
@@ -223,10 +224,12 @@
   | `flow_high_lpm` | number | 流量上限 |
   | `ec_high_us_cm` | number | 电导率上限 |
   | `turb_high_ntu` | number | 浊度上限 |
+  | `ph_low` | number | PH 下限（≤ 此值报警） |
+  | `ph_high` | number | PH 上限（> 此值报警） |
 
 - **成功响应**（`200`）：`{"data": {...更新后的阈值...}}`
 - **错误**：
-  - `400` `{"error": "Field 'serial' is required"}` / `{"error": "阈值必须是数字"}` / `{"error": "温度下限必须小于上限"}`
+  - `400` `{"error": "Field 'serial' is required"}` / `{"error": "阈值必须是数字"}` / `{"error": "温度下限必须小于上限"}` / `{"error": "PH 下限必须小于上限"}`
   - `401` 未登录
   - `404` `{"error": "设备不存在或无权修改"}`
 
