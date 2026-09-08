@@ -151,6 +151,7 @@ body {
   border: none;
 }
 .btn-primary:hover {
+  background: var(--primary-gradient);
   box-shadow: 0 8px 28px rgba(74, 124, 247, 0.30);
   transform: translateY(-2px);
   color: #fff;
