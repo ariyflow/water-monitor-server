@@ -5,40 +5,180 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>登录 - 水质监测数据管理</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+  <style>
+    .auth-container {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: radial-gradient(ellipse at 30% 20%, rgba(74, 124, 247, 0.06) 0%, transparent 60%),
+                  radial-gradient(ellipse at 70% 80%, rgba(124, 108, 240, 0.04) 0%, transparent 60%),
+                  var(--bg-body);
+      padding: 1rem;
+    }
+
+    .auth-box {
+      background: var(--bg-card);
+      backdrop-filter: blur(16px);
+      border-radius: var(--border-radius);
+      padding: 2rem 2.2rem;
+      width: 380px;
+      max-width: 100%;
+      border: 1px solid var(--glass-border);
+      box-shadow: var(--glass-shadow);
+      overflow: hidden;
+      max-height: 440px;
+      transition: max-height 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    }
+    .auth-box.register-active {
+      max-height: 520px;
+    }
+
+    .auth-title {
+      margin: 0;
+      font-size: 1.3rem;
+      font-weight: 600;
+      background: var(--primary-gradient);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      text-align: center;
+    }
+    .auth-sub {
+      margin: 0.25rem 0 1.2rem;
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 0.85rem;
+    }
+
+    /* Tab 容器 */
+    .auth-tabs {
+      position: relative;
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1.2rem;
+      background: rgba(255, 255, 255, 0.5);
+      padding: 0.25rem;
+      border-radius: 60px;
+      border: 1px solid var(--glass-border);
+      overflow: hidden;
+    }
+
+    .auth-tab {
+      flex: 1;
+      padding: 0.5rem;
+      border: none;
+      background: transparent;
+      color: var(--text-secondary);
+      border-radius: 40px;
+      cursor: pointer;
+      font-size: 0.9rem;
+      font-weight: 500;
+      transition: color 0.3s ease;
+      z-index: 2;
+      position: relative;
+      text-align: center;
+    }
+    .auth-tab.active {
+      color: #fff;
+    }
+
+    /* 滑块指示条 */
+    .slider-indicator {
+      position: absolute;
+      bottom: 0.25rem;
+      left: 0.25rem;
+      height: calc(100% - 0.5rem);
+      width: calc(50% - 0.25rem);          /* 精确宽度 */
+      background: var(--primary-gradient);
+      border-radius: 40px;
+      transition: left 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+      z-index: 1;
+      box-shadow: 0 4px 16px rgba(74, 124, 247, 0.25);
+    }
+    /* 注册态：滑块右移 */
+    .auth-tabs.register-active .slider-indicator {
+      left: calc(50% + 0.25rem);
+    }
+
+    .auth-form-wrapper {
+      /* 无需额外样式 */
+    }
+
+    .auth-form label {
+      display: block;
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+      margin-bottom: 0.85rem;
+    }
+    .auth-form input {
+      width: 100%;
+      margin-top: 0.25rem;
+      padding: 0.55rem 0.7rem;
+      border: 1px solid rgba(74, 124, 247, 0.08);
+      border-radius: 60px;
+      font-size: 0.9rem;
+      background: rgba(255, 255, 255, 0.7);
+      transition: all 0.3s;
+      outline: none;
+    }
+    .auth-form input:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 4px rgba(74, 124, 247, 0.04);
+    }
+    .auth-form.hidden { display: none; }
+    .auth-form .btn-block {
+      width: 100%;
+      margin-top: 0.5rem;
+      padding: 0.65rem;
+      font-size: 0.95rem;
+    }
+    .auth-msg {
+      min-height: 1.2rem;
+      text-align: center;
+      font-size: 0.82rem;
+      margin: 0.9rem 0 0;
+    }
+    .auth-msg.error { color: var(--danger); }
+    .auth-msg.success { color: var(--success); }
+  </style>
 </head>
 <body>
   <main class="auth-container">
-    <div class="auth-box">
-      <h1 class="auth-title">水质监测数据管理</h1>
+    <div class="auth-box" id="authBox">
+      <h1 class="auth-title">水质监测</h1>
       <p class="auth-sub">Water Monitor Server</p>
 
-      <div class="auth-tabs">
+      <div class="auth-tabs" id="authTabs">
         <button type="button" class="auth-tab active" data-tab="login">登录</button>
         <button type="button" class="auth-tab" data-tab="register">注册</button>
+        <div class="slider-indicator" id="sliderIndicator"></div>
       </div>
 
-      <form id="login-form" class="auth-form">
-        <label>用户名
-          <input type="text" name="username" required autocomplete="username" placeholder="请输入用户名" />
-        </label>
-        <label>密码
-          <input type="password" name="password" required autocomplete="current-password" placeholder="请输入密码" />
-        </label>
-        <button type="submit" class="btn btn-primary btn-block">登录</button>
-      </form>
+      <div class="auth-form-wrapper">
+        <form id="login-form" class="auth-form">
+          <label>用户名
+            <input type="text" name="username" required autocomplete="username" placeholder="请输入用户名" />
+          </label>
+          <label>密码
+            <input type="password" name="password" required autocomplete="current-password" placeholder="请输入密码" />
+          </label>
+          <button type="submit" class="btn btn-primary btn-block">登录</button>
+        </form>
 
-      <form id="register-form" class="auth-form hidden">
-        <label>用户名
-          <input type="text" name="username" required autocomplete="username" placeholder="请输入用户名" />
-        </label>
-        <label>密码
-          <input type="password" name="password" required autocomplete="new-password" minlength="6" placeholder="至少 6 位" />
-        </label>
-        <label>确认密码
-          <input type="password" name="password2" required autocomplete="new-password"placeholder="请再次输入密码" />
-        </label>
-        <button type="submit" class="btn btn-primary btn-block">注册</button>
-      </form>
+        <form id="register-form" class="auth-form hidden">
+          <label>用户名
+            <input type="text" name="username" required autocomplete="username" placeholder="请输入用户名" />
+          </label>
+          <label>密码
+            <input type="password" name="password" required autocomplete="new-password" minlength="6" placeholder="至少 6 位" />
+          </label>
+          <label>确认密码
+            <input type="password" name="password2" required autocomplete="new-password" placeholder="请再次输入密码" />
+          </label>
+          <button type="submit" class="btn btn-primary btn-block">注册</button>
+        </form>
+      </div>
 
       <p id="auth-msg" class="auth-msg"></p>
     </div>

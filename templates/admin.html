@@ -3,111 +3,332 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>管理员后台 - 水质监测数据管理</title>
+  <title>管理员后台 · 水质监测</title>
+  <!-- 公共样式（含玻璃态卡片、按钮、表格、模态框、自定义下拉等） -->
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <!-- 管理员后台专用样式（滑块、图表容器等） -->
   <style>
-    .admin-wrap { max-width: 1200px; margin: 1.5rem auto 4rem; padding: 0 1rem; }
-    .selectors { background: #fff; border-radius: 10px; padding: 1rem 1.2rem; margin-bottom: 1rem; box-shadow: 0 2px 10px rgba(0,0,0,0.06); display: flex; gap: 1.5rem; flex-wrap: wrap; }
-    .selector { flex: 1; min-width: 240px; }
-    .selector label { display: block; font-size: 0.85rem; color: #5b6472; margin-bottom: 0.35rem; }
-    .selector select { width: 100%; padding: 0.5rem 0.65rem; border: 1px solid #d6dce6; border-radius: 6px; font-size: 0.9rem; background: #fff; }
-    .selector select:focus { outline: none; border-color: #1f6feb; }
-    .card { background: #fff; border-radius: 10px; padding: 1rem; box-shadow: 0 2px 10px rgba(0,0,0,0.06); overflow-x: auto; }
-    .empty { text-align: center; color: #9aa3b2; padding: 2rem; }
-    .table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
-    .table th, .table td { padding: 0.6rem 0.6rem; text-align: left; border-bottom: 1px solid #eceff3; }
-    .table th { background: #f8fafc; color: #5b6472; font-weight: 600; white-space: nowrap; }
-    .table tr:hover td { background: #f5f8ff; }
-    .toolbar { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem; }
-    .muted { color: #7a8496; font-size: 0.9rem; }
-    .pager { display: flex; align-items: center; gap: 0.6rem; margin-top: 0.9rem; justify-content: flex-end; flex-wrap: wrap; }
-    .pager button:disabled { background: #eef1f5; color: #a6afbc; cursor: not-allowed; }
-    #page-input { width: 70px; padding: 0.35rem 0.5rem; border: 1px solid #d6dce6; border-radius: 6px; font-size: 0.85rem; }
-    #page-input:focus { outline: none; border-color: #1f6feb; }
-    .user-actions { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
-    .badge { font-size: 0.72rem; padding: 0.15rem 0.5rem; border-radius: 999px; background: #eef2ff; color: #4f46e5; }
-    .badge.admin { background: #ffe9e9; color: #cf3c41; }
-    .modal-box label { display: block; font-size: 0.85rem; color: #5b6472; margin-bottom: 0.6rem; }
-    .modal-box input { width: 100%; margin-top: 0.25rem; padding: 0.5rem 0.65rem; border: 1px solid #d6dce6; border-radius: 6px; font-size: 0.9rem; }
-    .modal-box input:focus { outline: none; border-color: #1f6feb; }
+    /* ===== 滑块开关（展示模式切换） ===== */
+    .slider-container {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+    .slider-label {
+      font-size: 0.85rem;
+      font-weight: 500;
+      color: var(--text-secondary);
+      letter-spacing: 0.3px;
+      display: flex;
+      align-items: center;
+      gap: 0.3rem;
+      white-space: nowrap;
+    }
+    .slider-label svg {
+      width: 18px;
+      height: 18px;
+      stroke: currentColor;
+      stroke-width: 1.8;
+      fill: none;
+    }
+    .slider-switch {
+      position: relative;
+      width: 126px;
+      height: 42px;
+      background: rgba(255, 255, 255, 0.82);
+      border-radius: 999px;
+      border: 1px solid rgba(74, 124, 247, 0.22);
+      cursor: pointer;
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow:
+        inset 0 2px 6px rgba(0, 0, 0, 0.06),
+        0 4px 12px rgba(74, 124, 247, 0.08);
+      flex-shrink: 0;
+    }
+    .slider-switch .slider-thumb {
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      width: 36px;
+      height: 36px;
+      background: linear-gradient(135deg, #4a7cf7, #7c6cf0);
+      border-radius: 999px;
+      transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+      box-shadow:
+        0 4px 12px rgba(74, 124, 247, 0.25),
+        inset 0 1px 0 rgba(255, 255, 255, 0.35);
+      z-index: 3;
+    }
+    .slider-switch.chart .slider-thumb {
+      transform: translateX(81px);
+    }
+    .slider-switch .slider-text {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      transition: color 0.25s, opacity 0.25s;
+      pointer-events: none;
+      z-index: 2;
+      color: rgba(74, 124, 247, 0.85);
+      text-shadow: 0 0 0.5px rgba(74, 124, 247, 0.1);
+    }
+    .slider-switch .slider-text.left { left: 14px; }
+    .slider-switch .slider-text.right { right: 14px; }
+    .slider-switch.chart .slider-text.right { color: #ffffff; }
+    .slider-switch:not(.chart) .slider-text.left { color: #ffffff; }
+    .slider-switch.chart .slider-text.left { color: rgba(74, 124, 247, 0.55); }
+    .slider-switch:not(.chart) .slider-text.right { color: rgba(74, 124, 247, 0.55); }
+    .slider-switch:hover {
+      border-color: rgba(74, 124, 247, 0.35);
+      box-shadow:
+        inset 0 2px 6px rgba(0, 0, 0, 0.06),
+        0 6px 16px rgba(74, 124, 247, 0.14);
+    }
+    .slider-switch:active .slider-thumb { width: 40px; }
+
+    /* ===== 用户操作条 ===== */
+    #user-actions {
+      padding: 0.8rem 1.5rem;
+      display: none;
+    }
+    #user-actions .badge {
+      background: rgba(74, 124, 247, 0.08);
+      padding: 0.05rem 0.8rem;
+      border-radius: 30px;
+      font-size: 0.75rem;
+      color: var(--primary);
+      border: 1px solid rgba(74, 124, 247, 0.1);
+      margin-left: 0.3rem;
+    }
+
+    /* ===== 图表容器 ===== */
+    .chart-container {
+      position: relative;
+      height: 380px;
+      width: 100%;
+      margin-top: 0.3rem;
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 16px;
+      padding: 0.8rem 0.6rem;
+      backdrop-filter: blur(4px);
+    }
+    #chart-info {
+      color: var(--text-secondary);
+      font-size: 0.9rem;
+    }
+
+    /* ===== 控制栏布局 ===== */
+    .control-bar {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+    .control-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 1.5rem;
+    }
+    .control-row .spacer { flex: 1; }
+    .control-row .custom-select { min-width: 150px; }
+
+    /* ===== 移动端适配 ===== */
+    @media (max-width: 768px) {
+      .control-row { flex-direction: column; align-items: stretch; }
+      .control-row .custom-select { min-width: unset; }
+      .slider-switch {
+        width: 110px;
+        height: 38px;
+      }
+      .slider-switch .slider-thumb {
+        width: 32px;
+        height: 32px;
+      }
+      .slider-switch.chart .slider-thumb {
+        transform: translateX(75px);
+      }
+      .slider-switch .slider-text {
+        font-size: 0.7rem;
+      }
+      .slider-switch .slider-text.left { left: 10px; }
+      .slider-switch .slider-text.right { right: 10px; }
+      #user-actions { flex-wrap: wrap; }
+    }
   </style>
 </head>
 <body>
+  <!-- ===== 顶部导航 ===== -->
   <header class="topbar">
-    <h1>管理员后台</h1>
-    <span class="sub">选择用户 → 设备 → 查看数据</span>
+    <a href="#" class="topbar-brand">
+      <svg viewBox="0 0 24 24" fill="none" stroke="url(#brandGrad)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <defs><linearGradient id="brandGrad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#4a7cf7" /><stop offset="100%" stop-color="#7c6cf0" /></linearGradient></defs>
+        <path d="M12 2C12 2 5 10 5 15a7 7 0 0 0 14 0c0-5-7-13-7-13z" />
+        <circle cx="12" cy="15" r="2" fill="#4a7cf7" stroke="none" />
+      </svg>
+      <h1>水质监测</h1>
+    </a>
+    <span class="topbar-sub">管理后台</span>
     <span class="topbar-spacer"></span>
-    <span class="topbar-user">{% if user %}{{ user.username }}（管理员）{% endif %}</span>
-    <button id="btn-back" class="btn btn-outline">返回</button>
-    <button id="btn-logout" class="btn btn-outline">退出登录</button>
+    <span class="topbar-user">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
+      {% if user %}{{ user.username }}{% endif %}
+    </span>
+    <div class="btn-group">
+      <button id="btn-back" class="btn btn-outline">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5" /><path d="M12 19l-7-7 7-7" /></svg>返回
+      </button>
+      <button id="btn-logout" class="btn btn-outline">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" /></svg>退出
+      </button>
+    </div>
   </header>
 
-  <main class="admin-wrap">
-    <section class="selectors">
-      <div class="selector">
-        <label for="sel-user">用户</label>
-        <select id="sel-user"><option value="">请选择用户</option></select>
+  <main class="container">
+    <!-- ===== 用户 / 设备选择（自定义下拉） ===== -->
+    <section class="card">
+      <div class="selector-group">
+        <div class="selector-item">
+          <label for="sel-user">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>用户
+          </label>
+          <div class="custom-select" data-select-id="sel-user">
+            <select id="sel-user" class="hidden"></select>
+            <div class="dropdown-trigger" tabindex="0">
+              <span class="selected-text">请选择用户</span>
+              <span class="arrow">▾</span>
+            </div>
+          </div>
+        </div>
+        <div class="selector-item">
+          <label for="sel-device">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2" /><line x1="8" y1="10" x2="16" y2="10" /></svg>设备
+          </label>
+          <div class="custom-select" data-select-id="sel-device">
+            <select id="sel-device" class="hidden"></select>
+            <div class="dropdown-trigger" tabindex="0">
+              <span class="selected-text">请先选择用户</span>
+              <span class="arrow">▾</span>
+            </div>
+          </div>
+        </div>
       </div>
-      <div class="selector">
-        <label for="sel-device">设备</label>
-        <select id="sel-device" disabled><option value="">请先选择用户</option></select>
+    </section>
+
+    <!-- ===== 用户操作（管理用户） ===== -->
+    <section class="card" id="user-actions">
+      <div class="flex gap-2" style="flex-wrap:wrap;">
+        <span class="flex" style="font-size:0.95rem;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
+          已选择：<strong id="ua-username"></strong>
+          <span id="ua-role" class="badge"></span>
+        </span>
+        <span class="spacer"></span>
+        <button id="btn-reset-pwd" class="btn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4" /></svg>修改密码
+        </button>
+        <button id="btn-del-user" class="btn btn-danger">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /><line x1="10" y1="11" x2="10" y2="17" /><line x1="14" y1="11" x2="14" y2="17" /></svg>删除用户
+        </button>
       </div>
     </section>
 
-    <section class="card user-actions" id="user-actions" style="display:none;margin-bottom:1rem;">
-      <span>已选择用户：<strong id="ua-username"></strong><span id="ua-role" class="badge" style="margin-left:0.5rem;"></span></span>
-      <span class="topbar-spacer"></span>
-      <button id="btn-reset-pwd" class="btn">修改密码</button>
-      <button id="btn-del-user" class="btn btn-danger">删除用户</button>
+    <!-- ===== 控制栏：展示模式滑块 + 指标切换 + 时间范围 ===== -->
+    <section class="card">
+      <div class="control-bar">
+        <!-- 第一行：展示模式 + 指标 -->
+        <div class="control-row">
+          <div class="slider-container">
+            <span class="slider-label">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="2" /><line x1="8" y1="2" x2="8" y2="22" /><line x1="16" y1="2" x2="16" y2="22" /></svg>
+              展示模式
+            </span>
+            <div class="slider-switch chart" id="mode-slider">
+              <span class="slider-text left">列表</span>
+              <span class="slider-text right">图表</span>
+              <div class="slider-thumb"></div>
+            </div>
+          </div>
+          <span class="spacer"></span>
+          <span class="slider-label">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18" /><path d="M18 7v10" /><path d="M14 10v7" /><path d="M10 13v4" /><path d="M6 15v2" /></svg>
+            显示指标
+          </span>
+          <div class="toggle-group" id="metric-selector">
+            <button class="toggle-btn active" data-value="ph"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="M12 8v8" /><path d="M8 12h8" /></svg>pH</button>
+            <button class="toggle-btn active" data-value="temperature"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z" /><circle cx="11.5" cy="18.5" r="1.5" /></svg>温度</button>
+            <button class="toggle-btn active" data-value="flow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 12 10 8 14 12 18 8" /><line x1="6" y1="16" x2="18" y2="16" /></svg>流量</button>
+            <button class="toggle-btn active" data-value="turbidity"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="M12 2v20" /><path d="M2 12h20" /></svg>浊度</button>
+            <button class="toggle-btn active" data-value="conductivity"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 20L18 4" /><path d="M6 4L18 20" /></svg>电导率</button>
+          </div>
+        </div>
+        <!-- 第二行：时间范围 + 刷新 -->
+        <div class="control-row">
+          <span class="slider-label">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
+            时间范围
+          </span>
+          <div class="custom-select" data-select-id="time-range">
+            <select id="time-range" class="hidden">
+              <option value="24">最近1d</option>
+              <option value="72">最近3d</option>
+              <option value="168" selected>最近7d</option>
+              <option value="336">最近14d</option>
+              <option value="720">最近30d</option>
+            </select>
+            <div class="dropdown-trigger" tabindex="0">
+              <span class="selected-text">最近7d</span>
+              <span class="arrow">▾</span>
+            </div>
+          </div>
+          <span class="spacer"></span>
+          <button id="btn-refresh" class="btn btn-primary">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10" /><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" /></svg>刷新
+          </button>
+        </div>
+      </div>
     </section>
 
-    <section class="toolbar">
-      <span id="summary" class="muted">请选择用户与设备</span>
-      <span class="topbar-spacer"></span>
-      <label class="muted" style="font-size:0.85rem;">每页
-        <select id="page-size" style="padding:0.25rem 0.5rem;border-radius:6px;border:1px solid #d6dce6;">
-          <option value="20">20</option>
-          <option value="50" selected>50</option>
-          <option value="100">100</option>
-        </select>
-      </label>
-    </section>
-
+    <!-- ===== 数据展示（列表 / 图表） ===== -->
     <section class="card" id="data-card">
-      <table class="table">
-        <thead>
-          <tr>
-            <th>ID</th><th>pH</th><th>温度 (°C)</th><th>水流量</th>
-            <th>浊度</th><th>电导率</th><th>时间戳</th>
-          </tr>
-        </thead>
-        <tbody id="tbody">
-          <tr><td colspan="7" class="empty">暂无数据</td></tr>
-        </tbody>
-      </table>
-      <div class="pager">
-        <button id="btn-prev" class="btn" disabled>上一页</button>
-        <span id="page-info" class="muted">第 0 / 0 页</span>
-        <button id="btn-next" class="btn" disabled>下一页</button>
-        <span class="muted">跳至</span>
-        <input type="number" id="page-input" min="1" value="1" />
-        <button id="btn-goto" class="btn">跳转</button>
+      <!-- 列表视图 -->
+      <div id="list-view">
+        <div class="table-wrap">
+          <table class="table">
+            <thead><tr><th>ID</th><th>pH</th><th>温度 (°C)</th><th>水流量</th><th>浊度</th><th>电导率</th><th>时间戳</th></tr></thead>
+            <tbody id="tbody"><tr><td colspan="7" class="empty">请选择用户与设备</td></tr></tbody>
+          </table>
+        </div>
+        <div class="pager">
+          <button id="btn-prev" class="btn" disabled>◀ 上一页</button>
+          <span id="page-info" class="muted">第 0 / 0 页</span>
+          <button id="btn-next" class="btn" disabled>下一页 ▶</button>
+          <span class="muted">跳至</span>
+          <input type="number" id="page-input" min="1" value="1" />
+          <button id="btn-goto" class="btn">跳转</button>
+        </div>
+      </div>
+      <!-- 图表视图 -->
+      <div id="chart-view" class="hidden">
+        <div class="chart-container"><canvas id="sensorChart"></canvas></div>
+        <div style="text-align:right;margin-top:0.6rem;"><span class="muted" id="chart-info">选择设备后显示折线图</span></div>
       </div>
     </section>
   </main>
 
+  <!-- ===== 修改密码弹窗 ===== -->
   <div id="pwd-modal" class="modal hidden">
     <div class="modal-box">
-      <h2>修改密码</h2>
+      <h2>🔐 修改密码</h2>
       <form id="pwd-form">
-        <label>用户名</label>
-        <input type="text" id="pwd-username" disabled />
-        <label>新密码（至少 6 位）
-          <input type="password" name="password" required minlength="6" autocomplete="new-password" />
-        </label>
-        <label>确认新密码
-          <input type="password" name="password2" required minlength="6" autocomplete="new-password" />
-        </label>
+        <label>用户名</label><input type="text" id="pwd-username" disabled />
+        <label>新密码（至少 6 位）<input type="password" name="password" required minlength="6" autocomplete="new-password" /></label>
+        <label>确认密码<input type="password" name="password2" required minlength="6" autocomplete="new-password" /></label>
         <div class="modal-actions">
           <button type="button" id="btn-pwd-cancel" class="btn">取消</button>
           <button type="submit" class="btn btn-primary">保存</button>
@@ -116,8 +337,415 @@
     </div>
   </div>
 
+  <!-- Toast 容器 -->
   <div id="toast" class="toast hidden"></div>
 
+  <!-- ===== 隐藏的 page-size 下拉（供 admin.js 使用） ===== -->
+  <select id="page-size" class="hidden">
+    <option value="20">20</option>
+    <option value="50" selected>50</option>
+    <option value="100">100</option>
+  </select>
+
+  <!-- ===== 公共 JS（含 apiFetch, showToast, initCustomSelects 等） ===== -->
+  <script src="{{ url_for('static', filename='js/common.js') }}"></script>
+  <!-- ===== 管理员业务 JS ===== -->
   <script src="{{ url_for('static', filename='js/admin.js') }}"></script>
+
+  <!-- ===== 后台特有内联脚本（图表、滑块、数据刷新等） ===== -->
+  <script>
+    (function() {
+      'use strict';
+      console.log('✨ Admin 增强脚本 (最终修复版) 已启动');
+
+      // ---- 时间格式化（图表专用） ----
+      function formatTime(isoString, showFullDate = false) {
+        if (!isoString) return '—';
+        const d = new Date(isoString);
+        if (isNaN(d)) return isoString;
+        const pad = n => String(n).padStart(2, '0');
+        const year = d.getFullYear();
+        const month = pad(d.getMonth() + 1);
+        const day = pad(d.getDate());
+        const hours = pad(d.getHours());
+        const minutes = pad(d.getMinutes());
+        if (showFullDate) {
+          return `${year}-${month}-${day} ${hours}:${minutes}`;
+        }
+        return `${hours}:${minutes}`;
+      }
+      function formatChartLabel(isoString, prevDate) {
+        const d = new Date(isoString);
+        if (isNaN(d)) return isoString;
+        const dateStr = d.toDateString();
+        if (prevDate && dateStr === prevDate) {
+          return formatTime(isoString, false);
+        }
+        return formatTime(isoString, true);
+      }
+
+      // ---- DOM 引用 ----
+      const modeSlider = document.getElementById('mode-slider');
+      const toggleBtns = document.querySelectorAll('#metric-selector .toggle-btn');
+      const timeRangeSelect = document.getElementById('time-range');
+      const listView = document.getElementById('list-view');
+      const chartView = document.getElementById('chart-view');
+      const chartCanvas = document.getElementById('sensorChart');
+      const chartInfo = document.getElementById('chart-info');
+      const selDevice = document.getElementById('sel-device');
+      const tbody = document.getElementById('tbody');
+      const pageInfoEl = document.getElementById('page-info');
+      const btnPrev = document.getElementById('btn-prev');
+      const btnNext = document.getElementById('btn-next');
+      const pageInput = document.getElementById('page-input');
+      const btnGoto = document.getElementById('btn-goto');
+      const btnRefresh = document.getElementById('btn-refresh');
+
+      // ---- 状态 ----
+      let deviceThresholds = {};
+      let chartInstance = null;
+      let currentRecords = [];
+      let currentTotal = 0;
+      let currentPage = 1;
+      let currentPageSize = 50;
+
+      function getSelectedMetrics() {
+        const checked = [];
+        toggleBtns.forEach(btn => {
+          if (btn.classList.contains('active')) checked.push(btn.dataset.value);
+        });
+        return checked;
+      }
+      function getTimeRangeHours() { return timeRangeSelect ? parseInt(timeRangeSelect.value, 10) : 168; }
+      function getViewMode() {
+        if (!modeSlider) return 'chart';
+        return modeSlider.classList.contains('chart') ? 'chart' : 'list';
+      }
+      function getSelectedDeviceId() {
+        if (!selDevice) return null;
+        return parseInt(selDevice.value, 10) || null;
+      }
+
+      // ---- 加载阈值（示例） ----
+      async function fetchDeviceThresholds(serial) {
+        return {
+          temp_low_c: 0, temp_high_c: 50, flow_high_lpm: 20,
+          ec_high_us_cm: 500, turb_high_ntu: 40, ph_low: 4, ph_high: 10
+        };
+      }
+
+      // ---- 列表加载 ----
+      async function loadListData(deviceId, page = 1) {
+        if (!deviceId || !tbody) {
+          if (tbody) tbody.innerHTML = `<tr><td colspan="7" class="empty">请选择设备</td></tr>`;
+          return;
+        }
+        const url = `/api/admin/devices/${deviceId}/records?page=${page}&limit=${currentPageSize}`;
+        try {
+          const res = await fetch(url);
+          if (!res.ok) throw new Error('数据加载失败');
+          const json = await res.json();
+          currentRecords = json.data || [];
+          currentTotal = json.total || 0;
+          currentPage = json.page || 1;
+          renderTable(currentRecords, currentTotal, currentPage, currentPageSize);
+        } catch (e) {
+          console.error(e);
+          if (tbody) tbody.innerHTML = `<tr><td colspan="7" class="empty">加载失败</td></tr>`;
+          showToast('数据加载失败', 'error');
+        }
+      }
+
+      function renderTable(records, total, page, pageSize) {
+        if (!tbody) return;
+        if (!records || records.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="7" class="empty">暂无数据</td></tr>`;
+          if (pageInfoEl) pageInfoEl.textContent = '第 0 / 0 页';
+          if (btnPrev) btnPrev.disabled = true;
+          if (btnNext) btnNext.disabled = true;
+          if (pageInput) { pageInput.value = 1; pageInput.max = 1; pageInput.disabled = true; }
+          if (btnGoto) btnGoto.disabled = true;
+          return;
+        }
+        const th = deviceThresholds;
+        const isAbnormal = (field, value) => {
+          if (value == null || value === '') return false;
+          const num = parseFloat(value);
+          if (isNaN(num)) return false;
+          switch (field) {
+            case 'ph': return (!isNaN(th.ph_low) && num <= th.ph_low) || (!isNaN(th.ph_high) && num > th.ph_high);
+            case 'temperature': return (!isNaN(th.temp_low_c) && num <= th.temp_low_c) || (!isNaN(th.temp_high_c) && num > th.temp_high_c);
+            case 'flow': return !isNaN(th.flow_high_lpm) && num > th.flow_high_lpm;
+            case 'turbidity': return !isNaN(th.turb_high_ntu) && num > th.turb_high_ntu;
+            case 'conductivity': return !isNaN(th.ec_high_us_cm) && num > th.ec_high_us_cm;
+            default: return false;
+          }
+        };
+        const cell = (value, field) => {
+          const text = value ?? '—';
+          if (isAbnormal(field, value)) return `<span class="abnormal">${text}</span>`;
+          return text;
+        };
+        let html = '';
+        records.forEach(r => {
+          const timeStr = formatTime(r.created_at, true);
+          html += `<tr>
+            <td>${r.id}</td>
+            <td>${cell(r.ph, 'ph')}</td>
+            <td>${cell(r.temperature, 'temperature')}</td>
+            <td>${cell(r.flow, 'flow')}</td>
+            <td>${cell(r.turbidity, 'turbidity')}</td>
+            <td>${cell(r.conductivity, 'conductivity')}</td>
+            <td>${timeStr}</td>
+          </tr>`;
+        });
+        tbody.innerHTML = html;
+        const totalPages = Math.max(1, Math.ceil(total / pageSize));
+        if (pageInfoEl) pageInfoEl.textContent = `第 ${page} / ${totalPages} 页（共 ${total} 条）`;
+        if (btnPrev) btnPrev.disabled = page <= 1;
+        if (btnNext) btnNext.disabled = page >= totalPages;
+        if (pageInput) { pageInput.value = page; pageInput.max = totalPages; pageInput.disabled = false; }
+        if (btnGoto) btnGoto.disabled = false;
+      }
+
+      // ---- 图表加载 ----
+      async function loadChartData(deviceId, hours) {
+        if (!deviceId || !chartInfo) {
+          if (chartInfo) chartInfo.textContent = '请选择设备';
+          if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
+          return;
+        }
+        const metrics = getSelectedMetrics();
+        if (metrics.length === 0) {
+          if (chartInfo) chartInfo.textContent = '请至少选择一个指标';
+          if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
+          return;
+        }
+        if (chartInfo) chartInfo.textContent = '加载中...';
+        try {
+          const limit = 500;
+          const url = `/api/admin/devices/${deviceId}/records?page=1&limit=${limit}`;
+          const res = await fetch(url);
+          if (!res.ok) throw new Error('数据获取失败');
+          const json = await res.json();
+          let data = json.data || [];
+          if (data.length === 0) {
+            if (chartInfo) chartInfo.textContent = '该设备无数据';
+            if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
+            return;
+          }
+          data = data.filter(d => d.created_at);
+          if (data.length === 0) { if (chartInfo) chartInfo.textContent = '数据缺少时间戳'; return; }
+          data.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+          if (hours) {
+            const now = new Date();
+            const cutoff = new Date(now.getTime() - hours * 3600 * 1000);
+            data = data.filter(d => new Date(d.created_at) >= cutoff);
+          }
+          if (data.length === 0) {
+            if (chartInfo) chartInfo.textContent = '所选时间段内无数据';
+            if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
+            return;
+          }
+          const labels = [];
+          let prevDate = null;
+          data.forEach(d => {
+            labels.push(formatChartLabel(d.created_at, prevDate));
+            const dateObj = new Date(d.created_at);
+            prevDate = dateObj.toDateString();
+          });
+          const metricMap = {
+            ph: { label: 'pH', borderColor: '#4a7cf7' },
+            temperature: { label: '温度 (°C)', borderColor: '#f9a825' },
+            flow: { label: '流量 (L/min)', borderColor: '#2ecf7a' },
+            turbidity: { label: '浊度 (NTU)', borderColor: '#a29bfe' },
+            conductivity: { label: '电导率 (μS/cm)', borderColor: '#fd79a8' }
+          };
+          const datasets = [];
+          metrics.forEach(key => {
+            const meta = metricMap[key];
+            if (!meta) return;
+            const values = data.map(d => { const v = parseFloat(d[key]); return isNaN(v) ? null : v; });
+            if (values.every(v => v === null)) return;
+            datasets.push({
+              label: meta.label,
+              data: values,
+              borderColor: meta.borderColor,
+              backgroundColor: meta.borderColor + '20',
+              borderWidth: 2,
+              tension: 0.4,
+              pointRadius: 1,
+              pointHoverRadius: 5,
+              fill: false,
+              spanGaps: false
+            });
+          });
+          if (datasets.length === 0) { if (chartInfo) chartInfo.textContent = '所选指标无有效数据'; return; }
+          if (!chartCanvas) return;
+          if (chartInstance) {
+            chartInstance.data.labels = labels;
+            chartInstance.data.datasets = datasets;
+            chartInstance.update();
+          } else {
+            const ctx = chartCanvas.getContext('2d');
+            if (!ctx) { if (chartInfo) chartInfo.textContent = '无法获取绘图上下文'; return; }
+            chartInstance = new Chart(ctx, {
+              type: 'line',
+              data: { labels, datasets },
+              options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: { mode: 'index', intersect: false },
+                plugins: {
+                  legend: {
+                    position: 'top',
+                    labels: { color: '#4a5a72', usePointStyle: true, padding: 20 }
+                  },
+                  tooltip: {
+                    backgroundColor: 'rgba(255,255,255,0.9)',
+                    titleColor: '#1a2639',
+                    bodyColor: '#1a2639',
+                    borderColor: 'rgba(74,124,247,0.1)',
+                    borderWidth: 1,
+                    callbacks: {
+                      label: function(context) {
+                        let label = context.dataset.label || '';
+                        if (context.parsed.y !== null) label += ': ' + context.parsed.y.toFixed(2);
+                        return label;
+                      }
+                    }
+                  }
+                },
+                scales: {
+                  x: {
+                    ticks: { color: '#8a9bb0', maxTicksLimit: 20, autoSkip: true },
+                    title: { display: true, text: '时间', color: '#8a9bb0' },
+                    grid: { color: 'rgba(0,0,0,0.03)' }
+                  },
+                  y: {
+                    ticks: { color: '#8a9bb0' },
+                    title: { display: true, text: '数值', color: '#8a9bb0' },
+                    grid: { color: 'rgba(0,0,0,0.03)' }
+                  }
+                }
+              }
+            });
+          }
+          if (chartInfo) chartInfo.textContent = `显示 ${datasets.length} 个指标，共 ${data.length} 个数据点`;
+        } catch (e) {
+          console.error('图表加载异常:', e);
+          if (chartInfo) chartInfo.textContent = '图表加载失败: ' + e.message;
+          showToast('图表加载失败', 'error');
+          if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
+        }
+      }
+
+      // ---- 刷新数据 ----
+      async function refreshData() {
+        const deviceId = getSelectedDeviceId();
+        if (!deviceId) {
+          if (tbody) tbody.innerHTML = `<tr><td colspan="7" class="empty">请选择设备</td></tr>`;
+          if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
+          if (chartInfo) chartInfo.textContent = '请选择设备';
+          return;
+        }
+        deviceThresholds = {
+          temp_low_c: 0, temp_high_c: 50, flow_high_lpm: 20,
+          ec_high_us_cm: 500, turb_high_ntu: 40, ph_low: 4, ph_high: 10
+        };
+        const mode = getViewMode();
+        if (mode === 'list') {
+          if (listView) listView.classList.remove('hidden');
+          if (chartView) chartView.classList.add('hidden');
+          await loadListData(deviceId, currentPage);
+        } else {
+          if (listView) listView.classList.add('hidden');
+          if (chartView) chartView.classList.remove('hidden');
+          await loadChartData(deviceId, getTimeRangeHours());
+        }
+      }
+
+      // ---- 滑块交互 ----
+      if (modeSlider) {
+        modeSlider.addEventListener('click', function(e) {
+          e.stopPropagation();
+          this.classList.toggle('chart');
+          refreshData();
+        });
+      }
+
+      // ---- Toggle 按钮 ----
+      toggleBtns.forEach(btn => {
+        btn.addEventListener('click', function(e) {
+          e.preventDefault();
+          this.classList.toggle('active');
+          refreshData();
+        });
+      });
+
+      // ---- 事件绑定 ----
+      if (timeRangeSelect) timeRangeSelect.addEventListener('change', refreshData);
+      if (selDevice) {
+        selDevice.addEventListener('change', function() {
+          currentPage = 1;
+          refreshData();
+        });
+      }
+      if (btnRefresh) btnRefresh.addEventListener('click', refreshData);
+      if (btnPrev) {
+        btnPrev.addEventListener('click', function() {
+          if (currentPage > 1) {
+            currentPage--;
+            refreshData();
+          }
+        });
+      }
+      if (btnNext) {
+        btnNext.addEventListener('click', function() {
+          const totalPages = Math.ceil(currentTotal / currentPageSize);
+          if (currentPage < totalPages) {
+            currentPage++;
+            refreshData();
+          }
+        });
+      }
+      if (btnGoto) {
+        btnGoto.addEventListener('click', function() {
+          let page = parseInt(pageInput ? pageInput.value : 1, 10);
+          if (isNaN(page) || page < 1) page = 1;
+          const totalPages = Math.ceil(currentTotal / currentPageSize);
+          if (page > totalPages) page = totalPages;
+          currentPage = page;
+          refreshData();
+        });
+      }
+      if (pageInput) {
+        pageInput.addEventListener('keydown', function(e) {
+          if (e.key === 'Enter' && btnGoto) btnGoto.click();
+        });
+      }
+      const pageSizeSelect = document.getElementById('page-size');
+      if (pageSizeSelect) {
+        pageSizeSelect.addEventListener('change', function() {
+          currentPageSize = parseInt(this.value, 10);
+          currentPage = 1;
+          refreshData();
+        });
+        currentPageSize = parseInt(pageSizeSelect.value, 10);
+      }
+
+      // ---- 等待设备列表加载完成后触发首次刷新 ----
+      let initInterval = setInterval(() => {
+        if (selDevice && selDevice.options.length > 1 && selDevice.value) {
+          clearInterval(initInterval);
+          setTimeout(refreshData, 400);
+        }
+      }, 300);
+
+      // 暴露刷新函数给 admin.js 调用
+      window.adminRefreshData = refreshData;
+      console.log('✅ 最终修复版 Admin 增强脚本初始化完成。');
+    })();
+  </script>
 </body>
 </html>
